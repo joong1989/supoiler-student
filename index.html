@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>수포일러 | 학생</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <style>
 
 :root{font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;color:#14213d;background:#f4f6fb;font-synthesis:none}
@@ -26,7 +28,7 @@ button:hover{background:#1e39a3}button:disabled{opacity:.55;cursor:wait}.hidden{
 #quizPlay label.option{display:flex;align-items:flex-start;gap:10px;padding:13px 12px;border:1px solid #dbe3f0;border-radius:12px;margin:9px 0;background:white;cursor:pointer;font-weight:500;line-height:1.65;min-height:48px}
 #quizPlay label.option:has(input:checked){background:#edf3ff;border-color:#2546c7;box-shadow:inset 0 0 0 1px #2546c7}
 #quizPlay label.option input{flex:none;width:19px;height:19px;margin:3px 0 0;accent-color:#2546c7}#quizPlay label.option span{min-width:0;overflow-wrap:anywhere}
-.question{padding:16px 0;border-bottom:1px solid #e2e8f0}.question strong{white-space:pre-wrap}.option{display:block;padding:7px 0}sup{font-size:.72em;line-height:0;vertical-align:super}.math-content{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8}
+.question{padding:16px 0;border-bottom:1px solid #e2e8f0}.question strong{white-space:pre-wrap}.option{display:block;padding:7px 0}sup{font-size:.72em;line-height:0;vertical-align:super}.math-content{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8}.math-content .katex{font-size:1.04em}.math-content .katex-html{white-space:nowrap}.math-content .math-fallback{font-family:inherit}
 @media(max-width:520px){.wrap{padding:0 0 35px}.card{border:0;border-radius:0;min-height:100vh;padding:22px 18px}.chart{padding:12px}.chartrow{grid-template-columns:48px minmax(0,1fr) 62px;gap:7px}.review{padding:13px}#quizPlay{padding:14px}}
 @media(prefers-reduced-motion:reduce){button{transition:none}*{scroll-behavior:auto!important}}
 
@@ -39,39 +41,51 @@ button:hover{background:#1e39a3}button:disabled{opacity:.55;cursor:wait}.hidden{
 <div id="account" class="hidden"><h2 id="who"></h2><button id="logout">로그아웃</button><h3>공개 퀴즈</h3><div id="quizList">불러오는 중...</div><div id="quizDetail" class="hidden"></div><div id="quizPlay" class="hidden"></div><h3>내 학습기록</h3><div id="records">불러오는 중...</div></div>
 <p id="msg" role="status" aria-live="polite"></p></section></main>
 <script>
-// 7.2단계: 지수/부등호/집합 기호 표시 보완. 저장된 원문은 변경하지 않습니다.
-// 텍스트 노드만 사용하여 학생이 입력한 내용이 HTML로 실행되지 않게 합니다.
-function mathText(element, raw) {
-  // 저장된 원문은 수정하지 않습니다. HTML 문자열을 실행하지 않고 DOM 노드로만 렌더링합니다.
-  const source=String(raw ?? '');
-  element.replaceChildren();
-  element.classList.add('math-content');
-  const symbols={
-    '\\leq':'≤','\\le':'≤','\\geq':'≥','\\ge':'≥','\\neq':'≠',
-    '\\times':'×','\\div':'÷','\\in':'∈','\\notin':'∉',
-    '\\subset':'⊂','\\subseteq':'⊆','\\supset':'⊃','\\supseteq':'⊇',
-    '\\cup':'∪','\\cap':'∩','\\emptyset':'∅','\\forall':'∀',
-    '\\exists':'∃','\\neg':'¬','\\sqrt':'√',
-    '<=':'≤','>=':'≥','!=':'≠','\\':'\\'
+// 7.3단계: KaTeX로 명시적 수식과 안전하게 인식되는 짧은 수식만 조판합니다.
+// 한글 문장은 텍스트로 유지하고, 인식하지 못하는 부분은 원문 그대로 표시합니다.
+const MATH_SUP={'⁰':'0','¹':'1','²':'2','³':'3','⁴':'4','⁵':'5','⁶':'6','⁷':'7','⁸':'8','⁹':'9','⁺':'+','⁻':'-'};
+function normalizeMath(s){
+  return s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]+/g,t=>'^{' + [...t].map(c=>MATH_SUP[c]).join('') + '}')
+    .replace(/\\leq?\b|≤|<=/g,'\\leq ')
+    .replace(/\\geq?\b|≥|>=/g,'\\geq ')
+    .replace(/\\neq\b|≠|!=/g,'\\ne ')
+    .replace(/∈/g,'\\in ').replace(/∉/g,'\\notin ')
+    .replace(/∩/g,'\\cap ').replace(/∪/g,'\\cup ')
+    .replace(/⊆/g,'\\subseteq ').replace(/⊂/g,'\\subset ')
+    .replace(/⊇/g,'\\supseteq ').replace(/⊃/g,'\\supset ')
+    .replace(/∅/g,'\\varnothing ').replace(/×/g,'\\times ')
+    .replace(/÷/g,'\\div ')
+    .replace(/\^([0-9a-zA-Z])/g,'^{$1}');
+}
+function mathText(element,raw){
+  const source=String(raw??'');element.replaceChildren();element.classList.add('math-content');
+  const appendPlain=t=>{if(t)element.append(document.createTextNode(t));};
+  const appendMath=t=>{
+    if(!t)return;
+    if(!window.katex){appendPlain(t);return;}
+    try{
+      const span=document.createElement('span');
+      window.katex.render(normalizeMath(t),span,{throwOnError:true,strict:'ignore',trust:false,output:'htmlAndMathml'});
+      element.append(span);
+    }catch(e){appendPlain(t);}
   };
-  // 지수 ^0, ^2, ^{-1}, ^{10}, ^n 및 이미 입력된 유니코드 위첨자를 처리.
-  // 문장 중의 ^나 | 기호를 임의로 삭제하지 않습니다.
-  const token=/\^\{([^{}]{1,24})\}|\^(-?\d+(?:\.\d+)?|[a-zA-Z])|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁽⁾]+|\\(?:subseteq|supseteq|emptyset|forall|exists|notin|times|sqrt|subset|supset|leq|geq|neq|cup|cap|neg|div|in|le|ge)\b|<=|>=|!=|[≤≥≠∈∉⊂⊆⊃⊇∪∩∅∀∃¬×÷√]/g;
-  const superscripts={'⁰':'0','¹':'1','²':'2','³':'3','⁴':'4','⁵':'5','⁶':'6','⁷':'7','⁸':'8','⁹':'9','⁺':'+','⁻':'-','⁽':'(','⁾':')'};
-  let cursor=0,match;
-  while((match=token.exec(source))!==null){
-    if(match.index>cursor)element.append(document.createTextNode(source.slice(cursor,match.index)));
-    const found=match[0];
-    if(found[0]==='^' || /^[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁽⁾]+$/.test(found)){
-      const sup=document.createElement('sup');
-      sup.textContent=found[0]==='^'?(match[1]??match[2]??''):[...found].map(c=>superscripts[c]).join('');
-      element.append(sup);
-    }else{
-      element.append(document.createTextNode(symbols[found]??found));
+  // $...$와 \\(...\\)는 작성자가 명시한 수식으로 취급합니다.
+  // 일반 문장에서는 변수+지수, 부등식, 집합 연산, 절댓값 등 확실한 패턴만 인식합니다.
+  const explicit=/\$([^$\n]{1,300})\$|\\\(([^\n]{1,300}?)\\\)/g;
+  function scanPlain(text){
+    // 정규식은 한글 조사(는, 에, 이다 등)를 수식으로 끌어들이지 않도록 제한합니다.
+    const expr=/(?:\|[A-Za-z][A-Za-z0-9^{}+\-* ]{0,18}\|\s*(?:<=|>=|[<>≤≥=])\s*-?\d+)|(?:[A-Za-z](?:\^\{?-?[A-Za-z0-9]+\}?|[⁰¹²³⁴⁵⁶⁷⁸⁹]+)?\s*(?:<=|>=|[<>≤≥=≠]|\\(?:leq|geq|neq)\b)\s*-?\d+(?:\^\{?\d+\}?)?)|(?:[A-Za-z]\s*(?:∈|∉|\\(?:in|notin)\b)\s*[A-Za-z])|(?:[A-Za-z]\s*(?:∪|∩|⊂|⊆|⊃|⊇|\\(?:cup|cap|subseteq|subset|supseteq|supset)\b)\s*[A-Za-z])|(?:[A-Za-z]\^\{?-?[A-Za-z0-9]+\}?)|(?:[A-Za-z][⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g;
+    let last=0,m;
+    while((m=expr.exec(text))){
+      // 영단어 중간에서 변수를 잡지 않도록 좌측 경계 확인.
+      if(m.index>0 && /[A-Za-z0-9_]/.test(text[m.index-1]))continue;
+      appendPlain(text.slice(last,m.index));appendMath(m[0]);last=expr.lastIndex;
     }
-    cursor=token.lastIndex;
+    appendPlain(text.slice(last));
   }
-  if(cursor<source.length)element.append(document.createTextNode(source.slice(cursor)));
+  let last=0,m;
+  while((m=explicit.exec(source))){scanPlain(source.slice(last,m.index));appendMath(m[1]??m[2]);last=explicit.lastIndex;}
+  scanPlain(source.slice(last));
 }
 
 let activeAttempt=null,questionTimer=null;
