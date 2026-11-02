@@ -39,26 +39,39 @@ button:hover{background:#1e39a3}button:disabled{opacity:.55;cursor:wait}.hidden{
 <div id="account" class="hidden"><h2 id="who"></h2><button id="logout">로그아웃</button><h3>공개 퀴즈</h3><div id="quizList">불러오는 중...</div><div id="quizDetail" class="hidden"></div><div id="quizPlay" class="hidden"></div><h3>내 학습기록</h3><div id="records">불러오는 중...</div></div>
 <p id="msg" role="status" aria-live="polite"></p></section></main>
 <script>
-// 7.1단계: 원문 데이터는 그대로 두고 화면에서만 수학 표현을 변환합니다.
+// 7.2단계: 지수/부등호/집합 기호 표시 보완. 저장된 원문은 변경하지 않습니다.
 // 텍스트 노드만 사용하여 학생이 입력한 내용이 HTML로 실행되지 않게 합니다.
 function mathText(element, raw) {
-  const text=String(raw ?? '');
+  // 저장된 원문은 수정하지 않습니다. HTML 문자열을 실행하지 않고 DOM 노드로만 렌더링합니다.
+  const source=String(raw ?? '');
   element.replaceChildren();
-  // ^2, ^{10}, ^n, ^{-1} 형태와 일반적인 수학 기호를 처리합니다.
-  const token=/\^\{([^{}]{1,20})\}|\^(-?\d+|[a-zA-Z])|\\(?:leq|geq|neq|times|div|in|notin|subseteq|subset|cup|cap|emptyset|forall|exists|neg|sqrt)|<=|>=|!=|\*\*|[≤≥≠∈∉⊂⊆∪∩∅∀∃¬×÷√]/g;
-  const symbols={'\\leq':'≤','\\geq':'≥','\\neq':'≠','\\times':'×','\\div':'÷','\\in':'∈','\\notin':'∉','\\subset':'⊂','\\subseteq':'⊆','\\cup':'∪','\\cap':'∩','\\emptyset':'∅','\\forall':'∀','\\exists':'∃','\\neg':'¬','\\sqrt':'√','<=':'≤','>=':'≥','!=':'≠','**':'^'};
+  element.classList.add('math-content');
+  const symbols={
+    '\\leq':'≤','\\le':'≤','\\geq':'≥','\\ge':'≥','\\neq':'≠',
+    '\\times':'×','\\div':'÷','\\in':'∈','\\notin':'∉',
+    '\\subset':'⊂','\\subseteq':'⊆','\\supset':'⊃','\\supseteq':'⊇',
+    '\\cup':'∪','\\cap':'∩','\\emptyset':'∅','\\forall':'∀',
+    '\\exists':'∃','\\neg':'¬','\\sqrt':'√',
+    '<=':'≤','>=':'≥','!=':'≠','\\':'\\'
+  };
+  // 지수 ^0, ^2, ^{-1}, ^{10}, ^n 및 이미 입력된 유니코드 위첨자를 처리.
+  // 문장 중의 ^나 | 기호를 임의로 삭제하지 않습니다.
+  const token=/\^\{([^{}]{1,24})\}|\^(-?\d+(?:\.\d+)?|[a-zA-Z])|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁽⁾]+|\\(?:subseteq|supseteq|emptyset|forall|exists|notin|times|sqrt|subset|supset|leq|geq|neq|cup|cap|neg|div|in|le|ge)\b|<=|>=|!=|[≤≥≠∈∉⊂⊆⊃⊇∪∩∅∀∃¬×÷√]/g;
+  const superscripts={'⁰':'0','¹':'1','²':'2','³':'3','⁴':'4','⁵':'5','⁶':'6','⁷':'7','⁸':'8','⁹':'9','⁺':'+','⁻':'-','⁽':'(','⁾':')'};
   let cursor=0,match;
-  while((match=token.exec(text))!==null){
-    if(match.index>cursor)element.append(document.createTextNode(text.slice(cursor,match.index)));
+  while((match=token.exec(source))!==null){
+    if(match.index>cursor)element.append(document.createTextNode(source.slice(cursor,match.index)));
     const found=match[0];
-    if(found.startsWith('^') && found!=='**'){
-      const sup=document.createElement('sup');sup.textContent=match[1]??match[2]??'';element.append(sup);
-    }else element.append(document.createTextNode(symbols[found]??found));
+    if(found[0]==='^' || /^[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁽⁾]+$/.test(found)){
+      const sup=document.createElement('sup');
+      sup.textContent=found[0]==='^'?(match[1]??match[2]??''):[...found].map(c=>superscripts[c]).join('');
+      element.append(sup);
+    }else{
+      element.append(document.createTextNode(symbols[found]??found));
+    }
     cursor=token.lastIndex;
   }
-  if(cursor<text.length)element.append(document.createTextNode(text.slice(cursor)));
-  // 공백과 줄바꿈은 원문 그대로 유지합니다.
-  element.classList.add('math-content');
+  if(cursor<source.length)element.append(document.createTextNode(source.slice(cursor)));
 }
 
 let activeAttempt=null,questionTimer=null;
