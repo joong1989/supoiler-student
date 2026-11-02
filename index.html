@@ -1,59 +1,78 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>수포일러 | 학생</title><style>body{font-family:system-ui,'Malgun Gothic',sans-serif;background:#f5f7fb;color:#17233d;margin:0}.wrap{max-width:560px;margin:7vh auto;padding:18px}.card{background:white;border-radius:18px;padding:26px;box-shadow:0 8px 28px #182b4b14}h1{margin:0 0 8px}p{color:#566176}label{display:block;margin-top:17px;font-weight:600}input,select{box-sizing:border-box;width:100%;font:inherit;padding:13px;border:1px solid #cbd5e1;border-radius:10px;margin-top:6px}button{border:0;border-radius:10px;background:#2546c7;color:white;padding:13px 17px;font:inherit;cursor:pointer;margin-top:20px;width:100%}button:disabled{opacity:.5}.muted{font-size:13px}.err{color:#b42318}.ok{color:#167145}.hidden{display:none}.stat{background:#eef2ff;padding:12px;border-radius:10px;margin:10px 0}.quiz{padding:14px 0;border-bottom:1px solid #e2e8f0}.quizcard{border:1px solid #dbe2ed;border-radius:12px;padding:14px;margin:12px 0}.quizcard button{margin-top:8px}.question{padding:12px 0;border-bottom:1px solid #e2e8f0}.option{display:block;padding:7px 0}.info{font-size:13px;color:#667085}</style></head><body><main class="wrap"><section class="card"><h1>수포일러</h1><p>수학 포기하기엔 아직 일러 · 학생용</p><div id="login"><label>학년반<select id="cls"><option value="">불러오는 중...</option></select></label><label>이름<input id="name" maxlength="30" autocomplete="name" placeholder="이름"></label><label>4자리 PIN<input id="pin" maxlength="4" inputmode="numeric" type="password" autocomplete="off" placeholder="숫자 4자리"></label><p class="muted">처음 이용하는 학생은 입력한 정보로 계정이 자동 생성될 수 있습니다. 이름과 PIN을 다른 사람에게 알려주지 마세요.</p><button id="loginBtn">로그인 / 처음 가입</button></div><div id="account" class="hidden"><h2 id="who"></h2><button id="logout">로그아웃</button><h3>공개 퀴즈</h3><div id="quizList">불러오는 중...</div><div id="quizDetail" class="hidden"></div><div id="quizPlay" class="hidden"></div><h3>내 학습기록</h3><div id="records">불러오는 중...</div></div><p id="msg" role="status"></p></section></main><script>
-let activeAttempt=null,questionTimer=null;
-const API='https://supoiler-student-api.joong1989.workers.dev';const $=id=>document.getElementById(id);let token=sessionStorage.getItem('supoiler_session5')||'';
-function msg(s,err=false){$('msg').textContent=s;$('msg').className=err?'err':'ok'}
-function showLogin(){token='';sessionStorage.removeItem('supoiler_session5');$('account').classList.add('hidden');$('login').classList.remove('hidden');$('pin').value='';}
-async function classes(){try{const r=await(await fetch(API+'/api/classes')).json();if(!r.ok)throw Error();$('cls').replaceChildren(new Option('학년반 선택',''),...r.classes.map(x=>new Option(x,x)));}catch{$('cls').replaceChildren(new Option('학년반을 불러오지 못했습니다',''));msg('서버 연결을 확인해 주세요.',true)}}
-async function records(){try{const res=await fetch(API+'/api/my-record',{headers:{Authorization:'Bearer '+token}}),r=await res.json();if(!r.ok){if(res.status===401)showLogin();throw Error(r.error||'기록 조회 실패')};$('who').textContent=r.student.className+' '+r.student.name;const box=$('records');box.replaceChildren();const s=document.createElement('div');s.className='stat';s.textContent=`참여 ${r.summary.count}회 · 평균 ${r.summary.avgScore}점 · 정답률 ${r.summary.correctRate}%`;box.append(s);for(const q of r.quizzes){const d=document.createElement('div');d.className='quiz';d.textContent=`${q.date} · ${q.title} · ${q.score}점 (${q.correct}/${q.total} 정답, 오답 ${q.wrong}개)`;box.append(d)}if(!r.quizzes.length){const p=document.createElement('p');p.textContent='아직 참여한 퀴즈가 없습니다.';box.append(p)}}catch(e){msg(e.message,true)}}
-$('loginBtn').onclick=async()=>{const className=$('cls').value,name=$('name').value.trim(),pin=$('pin').value;if(!className||!name||!/^[0-9]{4}$/.test(pin))return msg('학년반, 이름, 숫자 4자리 PIN을 입력해 주세요.',true);$('loginBtn').disabled=true;msg('확인 중...');try{const res=await fetch(API+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({className,name,pin})}),r=await res.json();if(!r.ok)throw Error(r.error||'로그인 실패');token=r.session;sessionStorage.setItem('supoiler_session5',token);$('login').classList.add('hidden');$('account').classList.remove('hidden');msg(r.created?'계정이 생성되었습니다.':'로그인되었습니다.');await Promise.all([records(),loadQuizzes()])}catch(e){msg(e.message,true)}finally{$('loginBtn').disabled=false}};
-$('logout').onclick=()=>{if(activeAttempt){msg('진행 중인 퀴즈를 마친 뒤 로그아웃해 주세요.',true);return;}showLogin();msg('로그아웃되었습니다.')};classes();if(token){$('login').classList.add('hidden');$('account').classList.remove('hidden');Promise.all([records(),loadQuizzes()])}
+/** 수포일러 5단계 Worker: 서명 문자열 통일, 신규 가입/로그인/내 기록. */
+const ORIGIN='https://joong1989.github.io';
+const headers={'Content-Type':'application/json; charset=utf-8','Access-Control-Allow-Origin':ORIGIN,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};
+const reply=(obj,status=200)=>new Response(JSON.stringify(obj),{status,headers});
+const hex=a=>Array.from(a).map(x=>x.toString(16).padStart(2,'0')).join('');
+const enc=new TextEncoder();
+async function key(secret){return crypto.subtle.importKey('raw',enc.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign','verify']);}
+async function mac(k,s){return hex(new Uint8Array(await crypto.subtle.sign('HMAC',k,enc.encode(s))));}
+async function bridge(env,action,payload){
+ const ts=String(Date.now()),nonce=hex(crypto.getRandomValues(new Uint8Array(16))),payloadRaw=JSON.stringify(payload);
+ const sig=await mac(await key(env.BRIDGE_SECRET),`${action}:${ts}:${nonce}:${payloadRaw}`);
+ const resp=await fetch(env.BRIDGE_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,ts,nonce,sig,payloadRaw}),redirect:'follow',signal:AbortSignal.timeout(15000)});
+ if(!resp.ok)throw Error('Bridge HTTP '+resp.status);
+ return resp.json();
+}
+const b64=s=>btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const unb64=s=>decodeURIComponent(escape(atob(s.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-s.length%4)%4))));
+async function session(env,studentId){const data=b64(JSON.stringify({id:studentId,exp:Date.now()+12*3600000}));return data+'.'+await mac(await key(env.BRIDGE_SECRET),'session:'+data);}
+async function verifySession(env,token){try{const [data,sig]=String(token||'').split('.');if(!data||!/^[a-f0-9]{64}$/.test(sig))return null;const valid=await crypto.subtle.verify('HMAC',await key(env.BRIDGE_SECRET),Uint8Array.from(sig.match(/../g).map(x=>parseInt(x,16))),enc.encode('session:'+data));if(!valid)return null;const x=JSON.parse(unb64(data));return x.exp>Date.now()&&/^ST[A-Z0-9]+$/.test(x.id)?x.id:null;}catch{return null;}}
+export default {async fetch(request,env){
+ const url=new URL(request.url);
+ if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':ORIGIN,'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Max-Age':'600'}});
+ if(url.pathname==='/api/health'&&request.method==='GET')return reply({ok:true,service:'supoiler-student-api',phase:'stage6c'});
+ if(!env.BRIDGE_URL||!env.BRIDGE_SECRET)return reply({ok:false,error:'Server not configured'},503);
+ if(url.pathname==='/api/classes'&&request.method==='GET')try{return reply(await bridge(env,'classes',{}));}catch{return reply({ok:false,error:'연결 오류'},502);}
+ if(url.pathname==='/api/login'&&request.method==='POST'){
+  try{const raw=await request.text();if(raw.length>2000)return reply({ok:false,error:'입력값이 너무 깁니다.'},400);const p=JSON.parse(raw);const r=await bridge(env,'login',{className:p.className,name:p.name,pin:p.pin});if(!r.ok)return reply(r,401);return reply({ok:true,created:!!r.created,student:r.student,session:await session(env,r.student.studentId)});}catch{return reply({ok:false,error:'로그인 처리 중 오류가 발생했습니다.'},502);}
+ }
+ if(url.pathname==='/api/quizzes'&&request.method==='GET'){
+  const id=await verifySession(env,(request.headers.get('Authorization')||'').replace(/^Bearer\s+/i,''));
+  if(!id)return reply({ok:false,error:'다시 로그인해 주세요.'},401);
+  try{const r=await bridge(env,'quizList',{studentId:id});return reply(r,r.ok?200:401);}catch{return reply({ok:false,error:'퀴즈 목록을 불러오지 못했습니다.'},502);}
+ }
+ if(url.pathname.startsWith('/api/quizzes/')&&request.method==='GET'){
+  const id=await verifySession(env,(request.headers.get('Authorization')||'').replace(/^Bearer\s+/i,''));
+  if(!id)return reply({ok:false,error:'다시 로그인해 주세요.'},401);
+  const quizId=decodeURIComponent(url.pathname.slice('/api/quizzes/'.length));
+  if(!/^QZ[A-Za-z0-9_-]+$/.test(quizId))return reply({ok:false,error:'잘못된 퀴즈 ID입니다.'},400);
+  try{const r=await bridge(env,'quizQuestions',{studentId:id,quizId});return reply(r,r.ok?200:404);}catch{return reply({ok:false,error:'문항을 불러오지 못했습니다.'},502);}
+ }
 
-async function loadQuizzes(){
- const box=$('quizList');box.textContent='공개 퀴즈를 불러오는 중...';
- try{const res=await fetch(API+'/api/quizzes',{headers:{Authorization:'Bearer '+token}});const r=await res.json();if(!r.ok)throw Error(r.error||'퀴즈 조회 실패');box.replaceChildren();
- if(!r.quizzes.length){box.textContent='현재 공개된 퀴즈가 없습니다.';return;}
- for(const q of r.quizzes){const d=document.createElement('div');d.className='quizcard';const h=document.createElement('strong');h.textContent=q.title;const p=document.createElement('p');p.className='info';p.textContent=[q.unit,q.questionCount+'문항',q.startMode,q.gameMode].filter(Boolean).join(' · ');const b=document.createElement('button');b.textContent='퀴즈 시작';b.onclick=()=>startQuiz(q.quizId);d.append(h,p,b);box.append(d);}
- }catch(e){box.textContent='퀴즈 목록을 불러오지 못했습니다.';msg(e.message,true)}
-}
-async function previewQuiz(quizId){
- const box=$('quizDetail');box.classList.remove('hidden');box.textContent='문항을 불러오는 중...';
- try{const res=await fetch(API+'/api/quizzes/'+encodeURIComponent(quizId),{headers:{Authorization:'Bearer '+token}});const r=await res.json();if(!r.ok)throw Error(r.error||'문항 조회 실패');box.replaceChildren();const h=document.createElement('h3');h.textContent=r.quiz.title;box.append(h);const p=document.createElement('p');p.className='info';p.textContent='6A단계: 문항 확인만 가능합니다. 답안 제출과 점수 저장은 다음 단계에서 연결합니다.';box.append(p);
- for(const q of r.questions){const d=document.createElement('div');d.className='question';const t=document.createElement('strong');t.textContent=q.number+'. '+q.question;d.append(t);if(q.type==='객관식'){q.options.forEach((x,i)=>{const o=document.createElement('div');o.className='option';o.textContent=(i+1)+'. '+x;d.append(o)});}else{const o=document.createElement('p');o.className='info';o.textContent='단답형 · 정답은 표시하지 않습니다.';d.append(o)}const tm=document.createElement('p');tm.className='info';tm.textContent=q.timeLimit?'제한시간 '+q.timeLimit+'초':'제한시간 없음';d.append(tm);box.append(d)}
- }catch(e){box.textContent='문항을 불러오지 못했습니다.';msg(e.message,true)}
-}
-</script></body></html>
-
-<script>
-async function startQuiz(quizId){
- if(activeAttempt)return msg('진행 중인 퀴즈를 먼저 마쳐 주세요.',true);
- const box=$('quizPlay');box.classList.remove('hidden');box.textContent='퀴즈를 준비하는 중...';$('quizDetail').classList.add('hidden');
- try{const res=await fetch(API+'/api/quiz-start',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({quizId})});const r=await res.json();if(!r.ok)throw Error(r.error||'퀴즈 시작 실패');if(!r.questions.length)throw Error('문항이 없습니다.');
- activeAttempt={ticket:r.ticket,quiz:r.quiz,questions:r.questions,index:0,answers:[]};renderQuestion();box.scrollIntoView({behavior:'smooth',block:'start'});
- }catch(e){box.textContent='퀴즈를 시작하지 못했습니다.';msg(e.message,true)}
-}
-function renderQuestion(){
- clearInterval(questionTimer);const a=activeAttempt;if(!a)return;const q=a.questions[a.index],box=$('quizPlay');box.replaceChildren();
- const heading=document.createElement('h3');heading.textContent=`${a.quiz.title} (${a.index+1}/${a.questions.length})`;box.append(heading);
- const title=document.createElement('p');title.style.whiteSpace='pre-wrap';title.textContent=q.number+'. '+q.question;box.append(title);
- const timer=document.createElement('p');timer.className='stat';box.append(timer);
- const form=document.createElement('div');let answerInput;
- if(q.type==='객관식'){
-  const group='choice'+a.index;q.options.forEach((opt,i)=>{const label=document.createElement('label');label.className='option';const radio=document.createElement('input');radio.type='radio';radio.name=group;radio.value=String(i+1);radio.style.width='auto';radio.style.marginRight='10px';label.append(radio,document.createTextNode((i+1)+'. '+opt));form.append(label)});
-  answerInput=()=>form.querySelector('input:checked')?.value||'';
- }else{const inp=document.createElement('input');inp.placeholder='답 입력';inp.maxLength=300;form.append(inp);answerInput=()=>inp.value.trim();}
- box.append(form);const btn=document.createElement('button');btn.textContent=a.index===a.questions.length-1?'마지막 답안 제출':'다음 문항';box.append(btn);
- const start=performance.now(),limit=Math.max(0,Number(q.timeLimit)||0);let done=false;
- const complete=async(timeout=false)=>{if(done)return;done=true;clearInterval(questionTimer);btn.disabled=true;const elapsed=(performance.now()-start)/1000;
- const responseTimeSec=Math.round((limit>0?Math.min(elapsed,limit):elapsed)*1000)/1000;
- a.answers.push({questionId:q.questionId,answer:timeout?'':answerInput(),responseTimeSec,timedOut:timeout});a.index++;
- if(a.index<a.questions.length)renderQuestion();else await submitAttempt();};
- btn.onclick=()=>complete(false);
- const tick=()=>{const elapsed=(performance.now()-start)/1000;if(limit>0){const remain=Math.max(0,limit-elapsed);timer.textContent='남은 시간: '+remain.toFixed(1)+'초';if(remain<=0)complete(true);}else timer.textContent='제한시간 없음';};
- tick();questionTimer=setInterval(tick,100);
-}
-async function submitAttempt(){
- const a=activeAttempt,box=$('quizPlay');box.textContent='채점 및 저장 중...';
- try{const res=await fetch(API+'/api/quiz-submit',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({ticket:a.ticket,answers:a.answers})});const r=await res.json();if(!r.ok)throw Error(r.error||'제출 실패');activeAttempt=null;box.replaceChildren();const title=document.createElement('h3');title.textContent='응시 완료';const p=document.createElement('p');p.textContent=`${r.score}점 · ${r.correct}/${r.total}문항 정답`;box.append(title,p);msg('퀴즈 결과가 저장되었습니다.');await records();}
- catch(e){box.replaceChildren();const p=document.createElement('p');p.className='err';p.textContent='저장에 실패했습니다: '+e.message;const retry=document.createElement('button');retry.textContent='동일한 답안 다시 제출';retry.onclick=submitAttempt;box.append(p,retry);msg('결과가 저장되지 않았을 수 있습니다. 새 퀴즈를 시작하지 말고 재제출해 주세요.',true)}
-}
-</script>
+ if(url.pathname==='/api/quiz-start'&&request.method==='POST'){
+  const id=await verifySession(env,(request.headers.get('Authorization')||'').replace(/^Bearer\s+/i,''));if(!id)return reply({ok:false,error:'다시 로그인해 주세요.'},401);
+  try{const raw=await request.text();if(raw.length>1000)return reply({ok:false,error:'요청이 너무 깁니다.'},400);
+   const p=JSON.parse(raw),quizId=String(p.quizId||'');if(!/^QZ[A-Za-z0-9_-]+$/.test(quizId))return reply({ok:false,error:'잘못된 퀴즈입니다.'},400);
+   const q=await bridge(env,'quizQuestions',{studentId:id,quizId});if(!q.ok)return reply(q,403);
+   if(q.quiz.startMode!=='개별 시작'||q.quiz.gameMode!=='레이스')return reply({ok:false,error:'현재 개별 시작·레이스 퀴즈만 응시할 수 있습니다.'},400);
+   const nonce=hex(crypto.getRandomValues(new Uint8Array(16))),data=b64(JSON.stringify({id,quizId,nonce,iat:Date.now(),exp:Date.now()+2*3600000}));
+   const ticket=data+'.'+await mac(await key(env.BRIDGE_SECRET),'attempt:'+data);
+   return reply({ok:true,quiz:q.quiz,questions:q.questions,ticket});
+  }catch{return reply({ok:false,error:'퀴즈를 시작할 수 없습니다.'},502);}
+ }
+ if(url.pathname==='/api/quiz-submit'&&request.method==='POST'){
+  const id=await verifySession(env,(request.headers.get('Authorization')||'').replace(/^Bearer\s+/i,''));if(!id)return reply({ok:false,error:'다시 로그인해 주세요.'},401);
+  try{const raw=await request.text();if(raw.length>25000)return reply({ok:false,error:'답안이 너무 깁니다.'},400);
+   const p=JSON.parse(raw),parts=String(p.ticket||'').split('.');if(parts.length!==2||!/^[a-f0-9]{64}$/.test(parts[1]))return reply({ok:false,error:'응시 정보가 유효하지 않습니다.'},400);
+   const valid=await crypto.subtle.verify('HMAC',await key(env.BRIDGE_SECRET),Uint8Array.from(parts[1].match(/../g).map(x=>parseInt(x,16))),enc.encode('attempt:'+parts[0]));
+   if(!valid)return reply({ok:false,error:'응시 정보가 유효하지 않습니다.'},401);
+   const a=JSON.parse(unb64(parts[0]));if(a.id!==id||a.exp<Date.now()||a.iat>Date.now()+5000||!/^QZ[A-Za-z0-9_-]+$/.test(a.quizId)||!/^[a-f0-9]{32}$/.test(a.nonce))return reply({ok:false,error:'응시 시간이 만료되었습니다.'},401);
+   if(!Array.isArray(p.answers)||p.answers.length>100)return reply({ok:false,error:'답안을 확인해 주세요.'},400);
+   const claimed=p.answers.reduce((s,x)=>s+Number(x.responseTimeSec),0);
+   if(!Number.isFinite(claimed)||claimed<0||claimed>(Date.now()-a.iat)/1000+5)return reply({ok:false,error:'응답시간을 확인해 주세요.'},400);
+   const r=await bridge(env,'quizSubmit',{studentId:id,quizId:a.quizId,attemptId:a.nonce,answers:p.answers});return reply(r,r.ok?200:400);
+  }catch{return reply({ok:false,error:'제출에 실패했습니다. 다시 시도해 주세요.'},502);}
+ }
+ if(url.pathname.startsWith('/api/my-record/')&&request.method==='GET'){
+  const id=await verifySession(env,(request.headers.get('Authorization')||'').replace(/^Bearer\s+/i,''));
+  if(!id)return reply({ok:false,error:'다시 로그인해 주세요.'},401);
+  let resultId;try{resultId=decodeURIComponent(url.pathname.slice('/api/my-record/'.length));}catch{return reply({ok:false,error:'잘못된 결과 ID입니다.'},400);}
+  if(!/^[A-Za-z0-9_-]{5,100}$/.test(resultId))return reply({ok:false,error:'잘못된 결과 ID입니다.'},400);
+  try{const r=await bridge(env,'recordDetail',{studentId:id,resultId});return reply(r,r.ok?200:404);}catch{return reply({ok:false,error:'오답 정보를 불러오지 못했습니다.'},502);}
+ }
+ if(url.pathname==='/api/my-record' &&request.method==='GET'){
+  const id=await verifySession(env,(request.headers.get('Authorization')||'').replace(/^Bearer\s+/i,''));if(!id)return reply({ok:false,error:'다시 로그인해 주세요.'},401);
+  try{const r=await bridge(env,'record',{studentId:id});return reply(r,r.ok?200:401);}catch{return reply({ok:false,error:'학습기록을 불러오지 못했습니다.'},502);}
+ }
+ return reply({ok:false,error:'Not found'},404);
+}};
