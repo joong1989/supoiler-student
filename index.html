@@ -1,4 +1,62 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>수포일러 | 학생</title><style>body{font-family:system-ui,'Malgun Gothic',sans-serif;background:#f5f7fb;color:#17233d;margin:0}.wrap{max-width:560px;margin:7vh auto;padding:18px}.card{background:white;border-radius:18px;padding:26px;box-shadow:0 8px 28px #182b4b14}h1{margin:0 0 8px}p{color:#566176}label{display:block;margin-top:17px;font-weight:600}input,select{box-sizing:border-box;width:100%;font:inherit;padding:13px;border:1px solid #cbd5e1;border-radius:10px;margin-top:6px}button{border:0;border-radius:10px;background:#2546c7;color:white;padding:13px 17px;font:inherit;cursor:pointer;margin-top:20px;width:100%}button:disabled{opacity:.5}.muted{font-size:13px}.err{color:#b42318}.ok{color:#167145}.hidden{display:none}.stat{background:#eef2ff;padding:12px;border-radius:10px;margin:10px 0}.quiz{padding:14px 0;border-bottom:1px solid #e2e8f0}.quizcard{border:1px solid #dbe2ed;border-radius:12px;padding:14px;margin:12px 0}.quizcard button{margin-top:8px}.question{padding:12px 0;border-bottom:1px solid #e2e8f0}.option{display:block;padding:7px 0}.info{font-size:13px;color:#667085}.chart{margin:14px 0;padding:14px;border:1px solid #dbe2ed;border-radius:12px}.chart h4{margin:0 0 12px}.chartrow{display:grid;grid-template-columns:76px 1fr 58px;gap:9px;align-items:center;margin:9px 0;font-size:13px}.charttrack{background:#e8eefb;border-radius:8px;height:15px;overflow:hidden}.chartfill{height:100%;background:#2546c7;border-radius:8px}.chartfill.rate{background:#169c81}.review{padding:14px;border:1px solid #dbe2ed;border-radius:12px;margin:12px 0}.review.bad{border-left:4px solid #d92d20}.review.good{border-left:4px solid #169c81}.review p{white-space:pre-wrap;overflow-wrap:anywhere}.reviewbtn{margin-top:8px}.smallbtn{margin:8px 0 0;padding:10px}.detailbox{margin:10px 0 18px}</style></head><body><main class="wrap"><section class="card"><h1>수포일러</h1><p>수학 포기하기엔 아직 일러 · 학생용</p><div id="login"><label>학년반<select id="cls"><option value="">불러오는 중...</option></select></label><label>이름<input id="name" maxlength="30" autocomplete="name" placeholder="이름"></label><label>4자리 PIN<input id="pin" maxlength="4" inputmode="numeric" type="password" autocomplete="off" placeholder="숫자 4자리"></label><p class="muted">처음 이용하는 학생은 입력한 정보로 계정이 자동 생성될 수 있습니다. 이름과 PIN을 다른 사람에게 알려주지 마세요.</p><button id="loginBtn">로그인 / 처음 가입</button></div><div id="account" class="hidden"><h2 id="who"></h2><button id="logout">로그아웃</button><h3>공개 퀴즈</h3><div id="quizList">불러오는 중...</div><div id="quizDetail" class="hidden"></div><div id="quizPlay" class="hidden"></div><h3>내 학습기록</h3><div id="records">불러오는 중...</div></div><p id="msg" role="status"></p></section></main><script>
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수포일러 | 학생</title>
+<style>
+
+:root{font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;color:#14213d;background:#f4f6fb;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0;line-height:1.65}button,input,select{font:inherit}
+.wrap{max-width:760px;margin:0 auto;padding:24px 16px 70px}
+.card{background:#fff;border:1px solid #e5eaf4;border-radius:22px;padding:clamp(18px,4vw,36px);box-shadow:0 14px 40px #14213d0b}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}.brand-mark{display:grid;place-items:center;background:#2546c7;color:white;border-radius:13px;width:48px;height:48px;font-size:25px;font-weight:800}.brand h1{font-size:clamp(26px,5vw,34px);line-height:1.1;margin:0;letter-spacing:-.04em}.brand p{font-size:13px;margin:5px 0 0;color:#66758f}
+h2{font-size:21px;margin:18px 0}h3{font-size:19px;margin:30px 0 12px}h4{margin:0 0 10px}p{margin:10px 0;color:#40506a}
+label{display:block;font-weight:650;margin:16px 0 0}input:not([type=radio]),select{width:100%;min-height:50px;margin-top:7px;padding:12px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;color:#14213d}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid #92adff;outline-offset:2px}
+button{width:100%;min-height:48px;border:0;border-radius:12px;background:#2546c7;color:#fff;padding:12px 16px;margin-top:16px;font-weight:700;cursor:pointer;transition:background .15s}
+button:hover{background:#1e39a3}button:disabled{opacity:.55;cursor:wait}.hidden{display:none!important}.muted,.info{font-size:13px;color:#66758f}.err{color:#b42318}.ok{color:#14794d}#msg{min-height:22px;font-size:14px}
+#account>h2{padding:12px 16px;background:#f0f4ff;border-radius:12px;font-size:17px;margin:0}#logout{width:auto;min-height:40px;padding:8px 16px;margin-top:12px;background:#eef2ff;color:#2546c7;font-size:14px}#logout:hover{background:#e1e9ff}
+.quizcard{padding:18px;border:1px solid #dbe3f0;border-radius:16px;margin:12px 0;background:#fff}.quizcard strong{font-size:16px}.quizcard p{margin:7px 0}.quizcard button{margin-top:10px}
+.stat{background:#eef2ff;color:#1e3b80;padding:14px;border-radius:12px;margin:12px 0;font-weight:650}
+.chart{margin:14px 0;padding:16px;border:1px solid #dbe3f0;border-radius:15px}.chart h4{font-size:15px}.chartrow{display:grid;grid-template-columns:60px minmax(0,1fr) 70px;gap:10px;align-items:center;margin:12px 0;font-size:13px;font-variant-numeric:tabular-nums}.chartrow>span:last-child{text-align:right}.charttrack{background:#e8eefb;border-radius:10px;height:16px;overflow:hidden}.chartfill{height:100%;background:#2546c7;border-radius:10px}.chartfill.rate{background:#15967d}
+.quiz{padding:16px 0;border-bottom:1px solid #e2e8f0;overflow-wrap:anywhere}.smallbtn{margin:10px 0 0;font-size:14px;min-height:44px}.detailbox{margin:14px 0 8px}.detailbox h4{font-size:16px}
+.review{padding:16px;border:1px solid #dbe3f0;border-left:5px solid #15967d;border-radius:12px;margin:12px 0;background:#fff}.review.bad{border-left-color:#d92d20;background:#fffafa}.review.good{border-left-color:#15967d;background:#f9fffc}.review p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8}.review strong{display:block}
+#quizPlay{margin:18px 0;padding:18px;border:1px solid #dbe3f0;border-radius:16px;background:#fbfcff}#quizPlay h3{margin:0 0 12px}#quizPlay>p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.9;font-size:16px}
+#quizPlay label.option{display:flex;align-items:flex-start;gap:10px;padding:13px 12px;border:1px solid #dbe3f0;border-radius:12px;margin:9px 0;background:white;cursor:pointer;font-weight:500;line-height:1.65;min-height:48px}
+#quizPlay label.option:has(input:checked){background:#edf3ff;border-color:#2546c7;box-shadow:inset 0 0 0 1px #2546c7}
+#quizPlay label.option input{flex:none;width:19px;height:19px;margin:3px 0 0;accent-color:#2546c7}#quizPlay label.option span{min-width:0;overflow-wrap:anywhere}
+.question{padding:16px 0;border-bottom:1px solid #e2e8f0}.question strong{white-space:pre-wrap}.option{display:block;padding:7px 0}sup{font-size:.72em;line-height:0;vertical-align:super}
+@media(max-width:520px){.wrap{padding:0 0 35px}.card{border:0;border-radius:0;min-height:100vh;padding:22px 18px}.chart{padding:12px}.chartrow{grid-template-columns:48px minmax(0,1fr) 62px;gap:7px}.review{padding:13px}#quizPlay{padding:14px}}
+@media(prefers-reduced-motion:reduce){button{transition:none}*{scroll-behavior:auto!important}}
+
+</style>
+</head>
+<body>
+<main class="wrap"><section class="card">
+<header class="brand"><div class="brand-mark" aria-hidden="true">∑</div><div><h1>수포일러</h1><p>수학 포기하기엔 아직 일러 · 학생용</p></div></header>
+<div id="login"><label for="cls">학년반</label><select id="cls"><option value="">불러오는 중...</option></select><label for="name">이름</label><input id="name" maxlength="30" autocomplete="name" placeholder="이름"><label for="pin">4자리 PIN</label><input id="pin" maxlength="4" inputmode="numeric" type="password" autocomplete="off" placeholder="숫자 4자리"><p class="muted">처음 이용하는 학생은 입력한 정보로 계정이 자동 생성될 수 있습니다. 이름과 PIN을 다른 사람에게 알려주지 마세요.</p><button id="loginBtn">로그인 / 처음 가입</button></div>
+<div id="account" class="hidden"><h2 id="who"></h2><button id="logout">로그아웃</button><h3>공개 퀴즈</h3><div id="quizList">불러오는 중...</div><div id="quizDetail" class="hidden"></div><div id="quizPlay" class="hidden"></div><h3>내 학습기록</h3><div id="records">불러오는 중...</div></div>
+<p id="msg" role="status" aria-live="polite"></p></section></main>
+<script>
+// 수식은 서버의 원문을 유지하고 화면에서만 안전하게 표시합니다.
+function mathText(element, raw) {
+  const text=String(raw ?? '');
+  const parts=text.split(/(\^\{?-?\d+\}?|<=|>=|!=|\\leq|\\geq|\\times|\\sqrt\{[^}]+\})/g);
+  for(const part of parts){
+    if(!part)continue;
+    if(/^\^\{?-?\d+\}?$/.test(part)){
+      const sup=document.createElement('sup');sup.textContent=part.slice(1).replace(/[{}]/g,'');element.append(sup);
+    }else if(part==='<='||part==='\\leq'){element.append(document.createTextNode('≤'));}
+    else if(part==='>='||part==='\\geq'){element.append(document.createTextNode('≥'));}
+    else if(part==='!=' ){element.append(document.createTextNode('≠'));}
+    else if(part==='\\times'){element.append(document.createTextNode('×'));}
+    else if(part.startsWith('\\sqrt{')){element.append(document.createTextNode('√('+part.slice(6,-1)+')'));}
+    else element.append(document.createTextNode(part));
+  }
+}
+
+
 let activeAttempt=null,questionTimer=null;
 const API='https://supoiler-student-api.joong1989.workers.dev';const $=id=>document.getElementById(id);let token=sessionStorage.getItem('supoiler_session5')||'';
 function msg(s,err=false){$('msg').textContent=s;$('msg').className=err?'err':'ok'}
@@ -14,7 +72,7 @@ async function showReview(resultId,container){
  try{const res=await fetch(API+'/api/my-record/'+encodeURIComponent(resultId),{headers:{Authorization:'Bearer '+token}});const r=await res.json();if(!r.ok)throw Error(r.error||'조회 실패');container.replaceChildren();
  const title=document.createElement('h4');title.textContent=r.result.title+' · '+r.result.correct+'/'+r.result.total+'문항 정답';container.append(title);
  if(!r.items.length){const p=document.createElement('p');p.textContent='이전 응시의 문항별 답안 정보가 없습니다.';container.append(p)}
- r.items.forEach(item=>{const card=document.createElement('div');card.className='review '+(item.correct?'good':'bad');const h=document.createElement('strong');h.textContent=item.number+'번 · '+(item.correct?'정답':'오답')+(item.timedOut?' (시간 초과)':'');const q=document.createElement('p');q.textContent=item.question;const a=document.createElement('p');a.textContent='내 답: '+item.myAnswer;card.append(h,q,a);if(!item.correct){const c=document.createElement('p');c.textContent='정답: '+item.correctAnswer;card.append(c)}container.append(card)});
+ r.items.forEach(item=>{const card=document.createElement('div');card.className='review '+(item.correct?'good':'bad');const h=document.createElement('strong');h.textContent=item.number+'번 · '+(item.correct?'정답':'오답')+(item.timedOut?' (시간 초과)':'');const q=document.createElement('p');mathText(q,item.question);const a=document.createElement('p');mathText(a,'내 답: '+item.myAnswer);card.append(h,q,a);if(!item.correct){const c=document.createElement('p');mathText(c,'정답: '+item.correctAnswer);card.append(c)}container.append(card)});
  }catch(e){container.textContent='오답 확인 실패: '+e.message}
 }
 async function records(){try{const res=await fetch(API+'/api/my-record',{headers:{Authorization:'Bearer '+token}}),r=await res.json();if(!r.ok){if(res.status===401)showLogin();throw Error(r.error||'기록 조회 실패')};$('who').textContent=r.student.className+' '+r.student.name;const box=$('records');box.replaceChildren();const s=document.createElement('div');s.className='stat';s.textContent=`참여 ${r.summary.count}회 · 평균 ${r.summary.avgScore}점 · 정답률 ${r.summary.correctRate}%`;box.append(s);
@@ -33,12 +91,11 @@ async function loadQuizzes(){
 async function previewQuiz(quizId){
  const box=$('quizDetail');box.classList.remove('hidden');box.textContent='문항을 불러오는 중...';
  try{const res=await fetch(API+'/api/quizzes/'+encodeURIComponent(quizId),{headers:{Authorization:'Bearer '+token}});const r=await res.json();if(!r.ok)throw Error(r.error||'문항 조회 실패');box.replaceChildren();const h=document.createElement('h3');h.textContent=r.quiz.title;box.append(h);const p=document.createElement('p');p.className='info';p.textContent='6A단계: 문항 확인만 가능합니다. 답안 제출과 점수 저장은 다음 단계에서 연결합니다.';box.append(p);
- for(const q of r.questions){const d=document.createElement('div');d.className='question';const t=document.createElement('strong');t.textContent=q.number+'. '+q.question;d.append(t);if(q.type==='객관식'){q.options.forEach((x,i)=>{const o=document.createElement('div');o.className='option';o.textContent=(i+1)+'. '+x;d.append(o)});}else{const o=document.createElement('p');o.className='info';o.textContent='단답형 · 정답은 표시하지 않습니다.';d.append(o)}const tm=document.createElement('p');tm.className='info';tm.textContent=q.timeLimit?'제한시간 '+q.timeLimit+'초':'제한시간 없음';d.append(tm);box.append(d)}
+ for(const q of r.questions){const d=document.createElement('div');d.className='question';const t=document.createElement('strong');mathText(t,q.number+'. '+q.question);d.append(t);if(q.type==='객관식'){q.options.forEach((x,i)=>{const o=document.createElement('div');o.className='option';mathText(o,(i+1)+'. '+x);d.append(o)});}else{const o=document.createElement('p');o.className='info';o.textContent='단답형 · 정답은 표시하지 않습니다.';d.append(o)}const tm=document.createElement('p');tm.className='info';tm.textContent=q.timeLimit?'제한시간 '+q.timeLimit+'초':'제한시간 없음';d.append(tm);box.append(d)}
  }catch(e){box.textContent='문항을 불러오지 못했습니다.';msg(e.message,true)}
 }
-</script></body></html>
 
-<script>
+
 async function startQuiz(quizId){
  if(activeAttempt)return msg('진행 중인 퀴즈를 먼저 마쳐 주세요.',true);
  const box=$('quizPlay');box.classList.remove('hidden');box.textContent='퀴즈를 준비하는 중...';$('quizDetail').classList.add('hidden');
@@ -49,11 +106,11 @@ async function startQuiz(quizId){
 function renderQuestion(){
  clearInterval(questionTimer);const a=activeAttempt;if(!a)return;const q=a.questions[a.index],box=$('quizPlay');box.replaceChildren();
  const heading=document.createElement('h3');heading.textContent=`${a.quiz.title} (${a.index+1}/${a.questions.length})`;box.append(heading);
- const title=document.createElement('p');title.style.whiteSpace='pre-wrap';title.textContent=q.number+'. '+q.question;box.append(title);
+ const title=document.createElement('p');title.style.whiteSpace='pre-wrap';mathText(title,q.number+'. '+q.question);box.append(title);
  const timer=document.createElement('p');timer.className='stat';box.append(timer);
  const form=document.createElement('div');let answerInput;
  if(q.type==='객관식'){
-  const group='choice'+a.index;q.options.forEach((opt,i)=>{const label=document.createElement('label');label.className='option';const radio=document.createElement('input');radio.type='radio';radio.name=group;radio.value=String(i+1);radio.style.width='auto';radio.style.marginRight='10px';label.append(radio,document.createTextNode((i+1)+'. '+opt));form.append(label)});
+  const group='choice'+a.index;q.options.forEach((opt,i)=>{const label=document.createElement('label');label.className='option';const radio=document.createElement('input');radio.type='radio';radio.name=group;radio.value=String(i+1);radio.style.width='auto';radio.style.marginRight='10px';label.append(radio);const optionText=document.createElement('span');mathText(optionText,(i+1)+'. '+opt);label.append(optionText);form.append(label)});
   answerInput=()=>form.querySelector('input:checked')?.value||'';
  }else{const inp=document.createElement('input');inp.placeholder='답 입력';inp.maxLength=300;form.append(inp);answerInput=()=>inp.value.trim();}
  box.append(form);const btn=document.createElement('button');btn.textContent=a.index===a.questions.length-1?'마지막 답안 제출':'다음 문항';box.append(btn);
@@ -71,4 +128,7 @@ async function submitAttempt(){
  try{const res=await fetch(API+'/api/quiz-submit',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({ticket:a.ticket,answers:a.answers})});const r=await res.json();if(!r.ok)throw Error(r.error||'제출 실패');activeAttempt=null;box.replaceChildren();const title=document.createElement('h3');title.textContent='응시 완료';const p=document.createElement('p');p.textContent=`${r.score}점 · ${r.correct}/${r.total}문항 정답`;box.append(title,p);msg('퀴즈 결과가 저장되었습니다.');await records();}
  catch(e){box.replaceChildren();const p=document.createElement('p');p.className='err';p.textContent='저장에 실패했습니다: '+e.message;const retry=document.createElement('button');retry.textContent='동일한 답안 다시 제출';retry.onclick=submitAttempt;box.append(p,retry);msg('결과가 저장되지 않았을 수 있습니다. 새 퀴즈를 시작하지 말고 재제출해 주세요.',true)}
 }
+
 </script>
+</body>
+</html>
