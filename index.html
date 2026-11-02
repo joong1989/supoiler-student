@@ -32,13 +32,15 @@ button:hover{background:#1e39a3}button:disabled{opacity:.55;cursor:wait}.hidden{
 @media(max-width:520px){.wrap{padding:0 0 35px}.card{border:0;border-radius:0;min-height:100vh;padding:22px 18px}.chart{padding:12px}.chartrow{grid-template-columns:48px minmax(0,1fr) 62px;gap:7px}.review{padding:13px}#quizPlay{padding:14px}}
 @media(prefers-reduced-motion:reduce){button{transition:none}*{scroll-behavior:auto!important}}
 
+
+.portalnav{display:flex;gap:7px;flex-wrap:wrap;margin:20px 0}.portalnav button{width:auto;min-height:39px;margin:0;padding:8px 12px;font-size:13px;background:#eaf0ff;color:#2546c7}.portalnav button[aria-current="page"]{background:#2546c7;color:white}.portal-item{padding:16px;border:1px solid #dbe3f0;border-radius:14px;margin:12px 0}.portal-item h4{margin:0 0 6px}.portal-item p{white-space:pre-wrap;overflow-wrap:anywhere}.portal-form textarea{width:100%;min-height:110px;border:1px solid #cbd5e1;border-radius:12px;padding:12px;font:inherit}.portal-form label{margin:12px 0 5px}.portal-form select,.portal-form input{margin-top:4px}.portal-link{overflow-wrap:anywhere}
 </style>
 </head>
 <body>
 <main class="wrap"><section class="card">
 <header class="brand"><div class="brand-mark" aria-hidden="true">∑</div><div><h1>수포일러</h1><p>수학 포기하기엔 아직 일러 · 학생용</p></div></header>
 <div id="login"><label for="cls">학년반</label><select id="cls"><option value="">불러오는 중...</option></select><label for="name">이름</label><input id="name" maxlength="30" autocomplete="name" placeholder="이름"><label for="pin">4자리 PIN</label><input id="pin" maxlength="4" inputmode="numeric" type="password" autocomplete="off" placeholder="숫자 4자리"><p class="muted">처음 이용하는 학생은 입력한 정보로 계정이 자동 생성될 수 있습니다. 이름과 PIN을 다른 사람에게 알려주지 마세요.</p><button id="loginBtn">로그인 / 처음 가입</button></div>
-<div id="account" class="hidden"><h2 id="who"></h2><button id="logout">로그아웃</button><h3>공개 퀴즈</h3><div id="quizList">불러오는 중...</div><div id="quizDetail" class="hidden"></div><div id="quizPlay" class="hidden"></div><h3>내 학습기록</h3><div id="records">불러오는 중...</div></div>
+<div id="account" class="hidden"><h2 id="who"></h2><button id="logout">로그아웃</button><nav class="portalnav" id="portalNav" aria-label="학생 메뉴"></nav><section id="portalPanel" class="hidden"></section><div id="quizArea"><h3>공개 퀴즈</h3><div id="quizList">불러오는 중...</div><div id="quizDetail" class="hidden"></div><div id="quizPlay" class="hidden"></div><h3>내 학습기록</h3><div id="records">불러오는 중...</div></div></div>
 <p id="msg" role="status" aria-live="polite"></p></section></main>
 <script>
 // 7.3단계: KaTeX로 명시적 수식과 안전하게 인식되는 짧은 수식만 조판합니다.
@@ -109,8 +111,8 @@ async function showReview(resultId,container){
 async function records(){try{const res=await fetch(API+'/api/my-record',{headers:{Authorization:'Bearer '+token}}),r=await res.json();if(!r.ok){if(res.status===401)showLogin();throw Error(r.error||'기록 조회 실패')};$('who').textContent=r.student.className+' '+r.student.name;const box=$('records');box.replaceChildren();const s=document.createElement('div');s.className='stat';s.textContent=`참여 ${r.summary.count}회 · 평균 ${r.summary.avgScore}점 · 정답률 ${r.summary.correctRate}%`;box.append(s);
  if(r.quizzes.length){makeChart(box,r.quizzes,'점수 변화 (최근 10회)','score');makeChart(box,r.quizzes,'정답률 변화 (최근 10회)','rate')}
  for(const q of r.quizzes){const d=document.createElement('div');d.className='quiz';const text=document.createElement('div');text.textContent=`${q.date} · ${q.title} · ${q.score}점 (${q.correct}/${q.total} 정답, 오답 ${q.wrong}개)`;const b=document.createElement('button');b.className='smallbtn';b.textContent='문항별 결과 확인';const detail=document.createElement('div');detail.className='detailbox hidden';b.onclick=async()=>{if(!detail.classList.contains('hidden')){detail.classList.add('hidden');b.textContent='문항별 결과 확인';return;}detail.classList.remove('hidden');b.textContent='결과 접기';await showReview(q.resultId,detail)};d.append(text,b,detail);box.append(d)}if(!r.quizzes.length){const p=document.createElement('p');p.textContent='아직 참여한 퀴즈가 없습니다.';box.append(p)}}catch(e){msg(e.message,true)}}
-$('loginBtn').onclick=async()=>{const className=$('cls').value,name=$('name').value.trim(),pin=$('pin').value;if(!className||!name||!/^[0-9]{4}$/.test(pin))return msg('학년반, 이름, 숫자 4자리 PIN을 입력해 주세요.',true);$('loginBtn').disabled=true;msg('확인 중...');try{const res=await fetch(API+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({className,name,pin})}),r=await res.json();if(!r.ok)throw Error(r.error||'로그인 실패');token=r.session;sessionStorage.setItem('supoiler_session5',token);$('login').classList.add('hidden');$('account').classList.remove('hidden');msg(r.created?'계정이 생성되었습니다.':'로그인되었습니다.');await Promise.all([records(),loadQuizzes()])}catch(e){msg(e.message,true)}finally{$('loginBtn').disabled=false}};
-$('logout').onclick=()=>{if(activeAttempt){msg('진행 중인 퀴즈를 마친 뒤 로그아웃해 주세요.',true);return;}showLogin();msg('로그아웃되었습니다.')};classes();if(token){$('login').classList.add('hidden');$('account').classList.remove('hidden');Promise.all([records(),loadQuizzes()])}
+$('loginBtn').onclick=async()=>{const className=$('cls').value,name=$('name').value.trim(),pin=$('pin').value;if(!className||!name||!/^[0-9]{4}$/.test(pin))return msg('학년반, 이름, 숫자 4자리 PIN을 입력해 주세요.',true);$('loginBtn').disabled=true;msg('확인 중...');try{const res=await fetch(API+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({className,name,pin})}),r=await res.json();if(!r.ok)throw Error(r.error||'로그인 실패');token=r.session;sessionStorage.setItem('supoiler_session5',token);$('login').classList.add('hidden');$('account').classList.remove('hidden');msg(r.created?'계정이 생성되었습니다.':'로그인되었습니다.');await Promise.all([records(),loadQuizzes()]);portalInit()}catch(e){msg(e.message,true)}finally{$('loginBtn').disabled=false}};
+$('logout').onclick=()=>{if(activeAttempt){msg('진행 중인 퀴즈를 마친 뒤 로그아웃해 주세요.',true);return;}showLogin();msg('로그아웃되었습니다.')};classes();if(token){$('login').classList.add('hidden');$('account').classList.remove('hidden');Promise.all([records(),loadQuizzes()]);portalInit()}
 
 async function loadQuizzes(){
  const box=$('quizList');box.textContent='공개 퀴즈를 불러오는 중...';
@@ -158,6 +160,53 @@ async function submitAttempt(){
  const a=activeAttempt,box=$('quizPlay');box.textContent='채점 및 저장 중...';
  try{const res=await fetch(API+'/api/quiz-submit',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({ticket:a.ticket,answers:a.answers})});const r=await res.json();if(!r.ok)throw Error(r.error||'제출 실패');activeAttempt=null;box.replaceChildren();const title=document.createElement('h3');title.textContent='응시 완료';const p=document.createElement('p');p.textContent=`${r.score}점 · ${r.correct}/${r.total}문항 정답`;box.append(title,p);msg('퀴즈 결과가 저장되었습니다.');await records();}
  catch(e){box.replaceChildren();const p=document.createElement('p');p.className='err';p.textContent='저장에 실패했습니다: '+e.message;const retry=document.createElement('button');retry.textContent='동일한 답안 다시 제출';retry.onclick=submitAttempt;box.append(p,retry);msg('결과가 저장되지 않았을 수 있습니다. 새 퀴즈를 시작하지 말고 재제출해 주세요.',true)}
+}
+
+
+// 8단계: 기존 시트 기반 학생 포털. 질문/피드백은 기존 브라우저의 익명 접근키를 재사용할 수 있습니다.
+const PORTAL_MENUS=[['home','홈'],['notices','공지사항'],['materials','수업자료'],['lessons','수업 기록'],['questions','질문게시판'],['feedbacks','수업 피드백'],['quizzes','형성평가 · 내 기록']];
+const portalState={menu:'quizzes'};
+function portalOwnerToken(){
+ const keys=['suporiler_anonymous_owner_v82','supoiler_anonymous_owner_v82','supoiler_owner_token_v82','anonymousOwnerTokenV82'];
+ for(const k of keys){const x=localStorage.getItem(k);if(x&&/^[a-zA-Z0-9_-]{20,120}$/.test(x))return x;}
+ let x=localStorage.getItem('supoiler_portal_owner_v8');if(!x){x='anon_'+Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>b.toString(16).padStart(2,'0')).join('');localStorage.setItem('supoiler_portal_owner_v8',x);}return x;
+}
+function portalNode(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=String(text);if(cls)e.className=cls;return e;}
+function portalItem(title,meta,body){const d=portalNode('article',undefined,'portal-item');d.append(portalNode('h4',title));if(meta)d.append(portalNode('small',meta,'muted'));if(body)d.append(portalNode('p',body));return d;}
+async function portalApi(kind,method='GET',data=null){
+ const url=API+'/api/portal'+(method==='GET'?'?kind='+encodeURIComponent(kind)+'&ownerToken='+encodeURIComponent(portalOwnerToken()):'');
+ const r=await fetch(url,{method,headers:{Authorization:'Bearer '+token,...(method==='POST'?{'Content-Type':'application/json'}:{})},...(method==='POST'?{body:JSON.stringify({kind,ownerToken:portalOwnerToken(),data})}:{})});
+ const v=await r.json();if(!v.ok)throw Error(v.error||'요청에 실패했습니다.');return v;
+}
+function portalNavigate(menu){
+ if(activeAttempt&&menu!=='quizzes')return msg('진행 중인 퀴즈를 마친 뒤 이동해 주세요.',true);
+ portalState.menu=menu;$('quizArea').classList.toggle('hidden',menu!=='quizzes');$('portalPanel').classList.toggle('hidden',menu==='quizzes');
+ document.querySelectorAll('#portalNav button').forEach(b=>b.setAttribute('aria-current',b.dataset.menu===menu?'page':'false'));
+ if(menu!=='quizzes')portalLoad(menu);
+}
+function portalInit(){const nav=$('portalNav');nav.replaceChildren();PORTAL_MENUS.forEach(([id,label])=>{const b=portalNode('button',label);b.type='button';b.dataset.menu=id;b.onclick=()=>portalNavigate(id);nav.append(b)});portalNavigate('home');}
+async function portalLoad(kind){const box=$('portalPanel');box.replaceChildren(portalNode('p','불러오는 중...'));
+ try{
+  if(kind==='home'){
+   const [n,m,l]=await Promise.all([portalApi('notices'),portalApi('materials'),portalApi('lessons')]);box.replaceChildren(portalNode('h3','수포일러 홈'));
+   [['최근 공지사항',n.items.slice(0,3),'notices'],['최근 수업자료',m.items.slice(0,3),'materials'],['최근 수업 기록',l.items.slice(0,3),'lessons']].forEach(([title,items,target])=>{box.append(portalNode('h4',title));items.forEach(x=>box.append(portalItem(x.title||x.unit||'수업',x.date||'',x.content||x.name||'')));const b=portalNode('button','전체 보기','smallbtn');b.onclick=()=>portalNavigate(target);box.append(b)});return;
+  }
+  const r=await portalApi(kind);box.replaceChildren(portalNode('h3',PORTAL_MENUS.find(x=>x[0]===kind)?.[1]||''));
+  if(kind==='questions'||kind==='feedbacks')portalForm(box,kind);
+  if(!r.items.length)box.append(portalNode('p','표시할 내역이 없습니다.'));
+  r.items.forEach(x=>{
+   if(kind==='notices')box.append(portalItem(x.title,x.createdAt||x.date,(x.importance==='중요'?'[중요] ':'')+x.content));
+   if(kind==='lessons')box.append(portalItem(x.unit||'수업 기록',[x.date,x.className].filter(Boolean).join(' · '),x.content));
+   if(kind==='materials'){const item=portalItem(x.title||'수업자료',[x.unit,x.type,x.folderName].filter(Boolean).join(' · '));if(/^https:\/\//i.test(x.link)){const a=portalNode('a','자료 열기','portal-link');a.href=x.link;a.target='_blank';a.rel='noopener noreferrer';item.append(a)}box.append(item);}
+   if(kind==='questions')box.append(portalItem(x.title,[x.date,x.unit,x.status].filter(Boolean).join(' · '),'질문: '+x.content+(x.answer?'\n\n선생님 답변: '+x.answer:'')));
+   if(kind==='feedbacks')box.append(portalItem(x.unit,[x.date,'이해도 '+x.understanding+'/5'].filter(Boolean).join(' · '),x.content));
+  });
+ }catch(e){box.replaceChildren(portalNode('p','불러오지 못했습니다: '+e.message,'err'));}
+}
+function portalForm(box,kind){const form=portalNode('form',undefined,'portal-form');const fields=kind==='questions'?[['unit','단원'],['title','질문 제목'],['content','질문 내용']]:[['unit','단원'],['content','오늘 수업 내용'],['understanding','이해도 (1~5)'],['difficult','어려웠던 점'],['notUnderstood','이해하지 못한 점'],['easy','쉬웠던 점'],['good','좋았던 점'],['disappointing','아쉬웠던 점'],['question','선생님께 질문']];
+ fields.forEach(([key,label])=>{const lab=portalNode('label',label);lab.htmlFor='portal_'+key;let field;if(key==='understanding'){field=document.createElement('select');field.append(new Option('이해도 선택',''),...[1,2,3,4,5].map(i=>new Option(i+'점',String(i))))}else if(['content','difficult','notUnderstood','easy','good','disappointing','question'].includes(key)){field=document.createElement('textarea');field.maxLength=key==='content'?5000:1500;}else{field=document.createElement('input');field.maxLength=key==='unit'?80:150;}field.id='portal_'+key;field.name=key;if(['unit','title','content','understanding'].includes(key))field.required=true;form.append(lab,field)});
+ const b=portalNode('button',kind==='questions'?'익명 질문 등록':'익명 피드백 제출');b.type='submit';form.append(b);const info=portalNode('p','기존 익명 접근키가 현재 브라우저에 남아 있다면 과거 내역도 확인할 수 있습니다. 다른 브라우저의 과거 내역은 자동으로 연결되지 않습니다.','muted');form.append(info);
+ form.onsubmit=async e=>{e.preventDefault();b.disabled=true;try{const data=Object.fromEntries(new FormData(form).entries());const r=await portalApi(kind==='questions'?'question':'feedback','POST',data);msg(r.message||'저장되었습니다.');await portalLoad(kind)}catch(err){msg(err.message,true)}finally{b.disabled=false}};box.append(form);
 }
 
 </script>
