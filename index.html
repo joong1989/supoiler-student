@@ -112,7 +112,7 @@ async function records(){try{const res=await fetch(API+'/api/my-record',{headers
  if(r.quizzes.length){makeChart(box,r.quizzes,'점수 변화 (최근 10회)','score');makeChart(box,r.quizzes,'정답률 변화 (최근 10회)','rate')}
  for(const q of r.quizzes){const d=document.createElement('div');d.className='quiz';const text=document.createElement('div');text.textContent=`${q.date} · ${q.title} · ${q.score}점 (${q.correct}/${q.total} 정답, 오답 ${q.wrong}개)`;const b=document.createElement('button');b.className='smallbtn';b.textContent='문항별 결과 확인';const detail=document.createElement('div');detail.className='detailbox hidden';b.onclick=async()=>{if(!detail.classList.contains('hidden')){detail.classList.add('hidden');b.textContent='문항별 결과 확인';return;}detail.classList.remove('hidden');b.textContent='결과 접기';await showReview(q.resultId,detail)};d.append(text,b,detail);box.append(d)}if(!r.quizzes.length){const p=document.createElement('p');p.textContent='아직 참여한 퀴즈가 없습니다.';box.append(p)}}catch(e){msg(e.message,true)}}
 $('loginBtn').onclick=async()=>{const className=$('cls').value,name=$('name').value.trim(),pin=$('pin').value;if(!className||!name||!/^[0-9]{4}$/.test(pin))return msg('학년반, 이름, 숫자 4자리 PIN을 입력해 주세요.',true);$('loginBtn').disabled=true;msg('확인 중...');try{const res=await fetch(API+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({className,name,pin})}),r=await res.json();if(!r.ok)throw Error(r.error||'로그인 실패');token=r.session;sessionStorage.setItem('supoiler_session5',token);$('login').classList.add('hidden');$('account').classList.remove('hidden');msg(r.created?'계정이 생성되었습니다.':'로그인되었습니다.');await Promise.all([records(),loadQuizzes()]);portalInit()}catch(e){msg(e.message,true)}finally{$('loginBtn').disabled=false}};
-$('logout').onclick=()=>{if(activeAttempt){msg('진행 중인 퀴즈를 마친 뒤 로그아웃해 주세요.',true);return;}showLogin();msg('로그아웃되었습니다.')};classes();if(token){$('login').classList.add('hidden');$('account').classList.remove('hidden');Promise.all([records(),loadQuizzes()]);portalInit()}
+$('logout').onclick=()=>{if(activeAttempt){msg('진행 중인 퀴즈를 마친 뒤 로그아웃해 주세요.',true);return;}showLogin();msg('로그아웃되었습니다.')};// 초기 실행은 포털 상수 및 함수 선언이 완료된 후 수행합니다.
 
 async function loadQuizzes(){
  const box=$('quizList');box.textContent='공개 퀴즈를 불러오는 중...';
@@ -209,6 +209,8 @@ function portalForm(box,kind){const form=portalNode('form',undefined,'portal-for
  form.onsubmit=async e=>{e.preventDefault();b.disabled=true;try{const data=Object.fromEntries(new FormData(form).entries());const r=await portalApi(kind==='questions'?'question':'feedback','POST',data);msg(r.message||'저장되었습니다.');await portalLoad(kind)}catch(err){msg(err.message,true)}finally{b.disabled=false}};box.append(form);
 }
 
+// 모든 const 초기화 이후에 자동 로그인 및 메뉴를 시작합니다.
+classes();if(token){$('login').classList.add('hidden');$('account').classList.remove('hidden');Promise.all([records(),loadQuizzes()]);portalInit()}
 </script>
 </body>
 </html>
