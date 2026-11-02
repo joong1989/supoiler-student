@@ -164,8 +164,8 @@ async function submitAttempt(){
 
 
 // 8단계: 기존 시트 기반 학생 포털. 질문/피드백은 기존 브라우저의 익명 접근키를 재사용할 수 있습니다.
-const PORTAL_MENUS=[['home','홈'],['notices','공지사항'],['materials','수업자료'],['lessons','수업 기록'],['questions','질문게시판'],['feedbacks','수업 피드백'],['quizzes','형성평가 · 내 기록']];
-const portalState={menu:'quizzes'};
+var PORTAL_MENUS=[['home','홈'],['notices','공지사항'],['materials','수업자료'],['lessons','수업 기록'],['questions','질문게시판'],['feedbacks','수업 피드백'],['quizzes','형성평가 · 내 기록']];
+var portalState={menu:'quizzes'};
 function portalOwnerToken(){
  const keys=['suporiler_anonymous_owner_v82','supoiler_anonymous_owner_v82','supoiler_owner_token_v82','anonymousOwnerTokenV82'];
  for(const k of keys){const x=localStorage.getItem(k);if(x&&/^[a-zA-Z0-9_-]{20,120}$/.test(x))return x;}
