@@ -6,9 +6,12 @@
 <title>수포일러 | 학생</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 
-:root{font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;color:#14213d;background:#f4f6fb;font-synthesis:none}
+:root{font-family:"Pretendard Variable",Pretendard,"Noto Sans KR","Malgun Gothic",sans-serif;color:#14213d;background:#f4f6fb;font-synthesis:none}
 *{box-sizing:border-box}body{margin:0;line-height:1.65}button,input,select{font:inherit}
 .wrap{max-width:760px;margin:0 auto;padding:24px 16px 70px}
 .card{background:#fff;border:1px solid #e5eaf4;border-radius:22px;padding:clamp(18px,4vw,36px);box-shadow:0 14px 40px #14213d0b}
@@ -34,6 +37,32 @@ button:hover{background:#1e39a3}button:disabled{opacity:.55;cursor:wait}.hidden{
 
 
 .portalnav{display:flex;gap:7px;flex-wrap:wrap;margin:20px 0}.portalnav button{width:auto;min-height:39px;margin:0;padding:8px 12px;font-size:13px;background:#eaf0ff;color:#2546c7}.portalnav button[aria-current="page"]{background:#2546c7;color:white}.portal-item{padding:16px;border:1px solid #dbe3f0;border-radius:14px;margin:12px 0}.portal-item h4{margin:0 0 6px}.portal-item p{white-space:pre-wrap;overflow-wrap:anywhere}.portal-form textarea{width:100%;min-height:110px;border:1px solid #cbd5e1;border-radius:12px;padding:12px;font:inherit}.portal-form label{margin:12px 0 5px}.portal-form select,.portal-form input{margin-top:4px}.portal-link{overflow-wrap:anywhere}
+
+/* 8.3: 포털 본문 타이포그래피 및 안전한 서식 표현 */
+.portal-item{background:#fff;border-color:#e2e8f2;padding:20px 22px;box-shadow:0 2px 10px rgba(22,44,88,.025)}
+.portal-item h4{font-size:16px;letter-spacing:-.025em;font-weight:750;color:#172b51}
+.portal-item small{display:block;margin:8px 0 12px;color:#71809b;font-size:12px}
+.portal-item .portal-rich{font-size:15px;line-height:1.85;color:#344766;overflow-wrap:anywhere;white-space:normal}
+.portal-rich p{margin:0 0 .6em;white-space:normal;line-height:inherit}
+.portal-rich p:last-child{margin-bottom:0}
+.portal-rich a{color:#2546c7;text-decoration:underline;text-underline-offset:3px}
+.portal-rich ul,.portal-rich ol{padding-left:1.5em;margin:.5em 0}
+.portal-rich blockquote{border-left:3px solid #d3ddf7;margin:10px 0;padding:4px 12px;color:#586985}
+.portal-rich img{max-width:100%;height:auto;border-radius:8px}
+.portal-rich table{max-width:100%;border-collapse:collapse;display:block;overflow-x:auto}
+.portal-rich td,.portal-rich th{border:1px solid #dbe3f0;padding:6px 10px}
+.portal-rich .katex{font-size:1.05em}
+.portalnav button{font-weight:650}
+@media(max-width:520px){.portal-item{padding:16px}.portal-item .portal-rich{font-size:14px}}
+
+/* 8.4: 기존 학생 공지 목록 / 상세 화면 */
+.portal-notice-listitem{display:block;width:100%;height:auto;text-align:left;background:#fff;color:#14213d;border:1px solid #dbe3f0;border-radius:14px;padding:17px 18px;margin:10px 0;line-height:1.6;white-space:normal}
+.portal-notice-listitem:hover{background:#f7f9ff}.portal-notice-listtitle{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.portal-notice-listitem strong{font-size:16px}.portal-notice-listitem small{display:block;margin-top:6px;color:#8190a7;font-size:12px}
+.portal-back{width:auto;background:transparent;color:#6d7e94;padding:6px 0;margin:2px 0 15px;font-weight:500;text-align:left}
+.portal-notice-detail h2{font-size:25px;letter-spacing:-.04em;margin:12px 0}.portal-important{display:inline-block;background:#ffe9ec;color:#dc3654;border-radius:20px;padding:4px 9px;font-size:12px;font-weight:650}
+.portal-notice-date{font-size:12px;color:#8a98aa;margin:8px 0 18px}.portal-notice-body{background:#f8f8f7;border-radius:14px;padding:20px 22px;color:#111;line-height:1.95;font-size:15px}
+.portal-notice-body .portal-rich{color:#111;font-size:15px;line-height:1.95}.portal-notice-body .portal-rich div{margin:0}.portal-notice-body .portal-rich br{display:block}
+@media(max-width:520px){.portal-notice-body{padding:16px}.portal-notice-detail h2{font-size:23px}}
 </style>
 </head>
 <body>
@@ -172,7 +201,72 @@ function portalOwnerToken(){
  let x=localStorage.getItem('supoiler_portal_owner_v8');if(!x){x='anon_'+Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>b.toString(16).padStart(2,'0')).join('');localStorage.setItem('supoiler_portal_owner_v8',x);}return x;
 }
 function portalNode(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=String(text);if(cls)e.className=cls;return e;}
-function portalItem(title,meta,body){const d=portalNode('article',undefined,'portal-item');d.append(portalNode('h4',title));if(meta)d.append(portalNode('small',meta,'muted'));if(body)d.append(portalNode('p',body));return d;}
+// 기존 편집기에서 저장한 HTML을 허용된 서식만 살려 안전하게 렌더링합니다.
+// 이벤트 핸들러, 스크립트, iframe, 외부 이미지 등은 삽입하지 않습니다.
+function portalRich(target,source){
+ const raw=String(source==null?'':source);
+ // 저장소에서 HTML이 &lt;div&gt;처럼 이스케이프된 경우 한 단계만 복원합니다.
+ // DOMParser로만 해석하고 아래 허용 목록을 통과한 요소만 실제 화면에 생성합니다.
+ const parser=new DOMParser();
+ const temp=parser.parseFromString('<div>'+raw+'</div>','text/html');
+ const text=temp.body.firstElementChild?.textContent||'';
+ const restored= /&lt;\/?(?:div|br|p|b|strong|font|span|i|em|u|ul|ol|li|a|h[1-6])\b/i.test(raw) ? text : raw;
+ const doc=parser.parseFromString('<div>'+restored+'</div>','text/html');
+ const allowed=new Set(['DIV','P','BR','B','STRONG','I','EM','U','S','STRIKE','SPAN','FONT','UL','OL','LI','BLOCKQUOTE','SUP','SUB','H1','H2','H3','H4','H5','H6','A','TABLE','THEAD','TBODY','TR','TH','TD','HR']);
+ const skip=new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','SVG','MATH','FORM','INPUT','BUTTON','TEXTAREA','SELECT','VIDEO','AUDIO','IMG','LINK','META']);
+ const colors=new Set(['red','blue','green','black','gray','grey','navy','maroon','purple','teal','orange','brown','#de0d0d','#ff0000','#000000','#0000ff','#008000']);
+ function safeColor(c){c=String(c||'').trim().toLowerCase();return colors.has(c)?c:'';}
+ function convert(node){
+  if(node.nodeType===3)return document.createTextNode(node.nodeValue);
+  if(node.nodeType!==1)return document.createDocumentFragment();
+  if(skip.has(node.tagName))return document.createDocumentFragment();
+  const valid=allowed.has(node.tagName);const out=valid?document.createElement(node.tagName==='FONT'?'span':node.tagName.toLowerCase()):document.createDocumentFragment();
+  if(valid){
+   if(node.tagName==='FONT'){const c=safeColor(node.getAttribute('color'));if(c)out.style.color=c;}
+   if(node.tagName==='SPAN'||node.tagName==='DIV'||node.tagName==='P'){
+    const style=String(node.getAttribute('style')||'');
+    const match=style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);const c=match?safeColor(match[1]):'';if(c)out.style.color=c;
+    if(/(?:^|;)\s*font-weight\s*:\s*(?:bold|[7-9]00)\b/i.test(style))out.style.fontWeight='bold';
+    if(/(?:^|;)\s*text-decoration\s*:\s*underline\b/i.test(style))out.style.textDecoration='underline';
+   }
+   if(node.tagName==='A'){
+    try{const url=new URL(node.getAttribute('href')||'',location.href);if(url.protocol==='https:'||url.protocol==='http:'){out.href=url.href;out.target='_blank';out.rel='noopener noreferrer';}}catch(e){}
+   }
+  }
+  for(const child of node.childNodes)out.append(convert(child));return out;
+ }
+ const rich=portalNode('div',undefined,'portal-rich');
+ for(const node of doc.body.firstElementChild.childNodes)rich.append(convert(node));
+ target.append(rich);
+}
+function portalItem(title,meta,body){const d=portalNode('article',undefined,'portal-item');d.append(portalNode('h4',title));if(meta)d.append(portalNode('small',meta,'muted'));if(body)portalRich(d,body);return d;}
+function portalNoticeDate(v){
+ const t=String(v||'').trim();if(!t)return '';
+ const m=t.match(/^(\d{4})[-.](\d{1,2})[-.](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+ return m?`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}${m[4]?' '+m[4].padStart(2,'0')+':'+m[5]:''}`:t;
+}
+function portalNoticeDetail(x,back){
+ const box=$('portalPanel');box.replaceChildren();
+ const backBtn=portalNode('button','〈 공지사항 목록으로','portal-back');backBtn.onclick=back;box.append(backBtn);
+ const article=portalNode('article',undefined,'portal-notice-detail');
+ if(/중요|고정|true|1/i.test(String(x.importance||'')))article.append(portalNode('span','📌 중요공지','portal-important'));
+ article.append(portalNode('h2',x.title||'공지사항'));
+ const dates=['작성 '+portalNoticeDate(x.date||x.createdAt),x.updatedAt?'· 수정 '+portalNoticeDate(x.updatedAt):''].filter(Boolean).join(' ');
+ article.append(portalNode('p',dates,'portal-notice-date'));
+ const content=portalNode('div',undefined,'portal-notice-body');portalRich(content,x.content||'');article.append(content);box.append(article);
+}
+function portalNoticeList(box,items,heading='공지사항'){
+ box.replaceChildren(portalNode('h3',heading));
+ if(!items.length){box.append(portalNode('p','표시할 공지사항이 없습니다.'));return;}
+ items.forEach(x=>{
+  const b=portalNode('button',undefined,'portal-notice-listitem');b.type='button';
+  const top=portalNode('div',undefined,'portal-notice-listtitle');
+  if(/중요|고정|true|1/i.test(String(x.importance||'')))top.append(portalNode('span','📌 중요','portal-important'));
+  top.append(portalNode('strong',x.title||'공지사항'));b.append(top);
+  b.append(portalNode('small',portalNoticeDate(x.date||x.createdAt),'muted'));
+  b.onclick=()=>portalNoticeDetail(x,()=>portalNoticeList(box,items,heading));box.append(b);
+ });
+}
 async function portalApi(kind,method='GET',data=null){
  const url=API+'/api/portal'+(method==='GET'?'?kind='+encodeURIComponent(kind)+'&ownerToken='+encodeURIComponent(portalOwnerToken()):'');
  const r=await fetch(url,{method,headers:{Authorization:'Bearer '+token,...(method==='POST'?{'Content-Type':'application/json'}:{})},...(method==='POST'?{body:JSON.stringify({kind,ownerToken:portalOwnerToken(),data})}:{})});
@@ -189,9 +283,10 @@ async function portalLoad(kind){const box=$('portalPanel');box.replaceChildren(p
  try{
   if(kind==='home'){
    const [n,m,l]=await Promise.all([portalApi('notices'),portalApi('materials'),portalApi('lessons')]);box.replaceChildren(portalNode('h3','수포일러 홈'));
-   [['최근 공지사항',n.items.slice(0,3),'notices'],['최근 수업자료',m.items.slice(0,3),'materials'],['최근 수업 기록',l.items.slice(0,3),'lessons']].forEach(([title,items,target])=>{box.append(portalNode('h4',title));items.forEach(x=>box.append(portalItem(x.title||x.unit||'수업',x.date||'',x.content||x.name||'')));const b=portalNode('button','전체 보기','smallbtn');b.onclick=()=>portalNavigate(target);box.append(b)});return;
+   [['최근 공지사항',n.items.slice(0,3),'notices'],['최근 수업자료',m.items.slice(0,3),'materials'],['최근 수업 기록',l.items.slice(0,3),'lessons']].forEach(([title,items,target])=>{box.append(portalNode('h4',title));items.forEach(x=>{if(target==='notices'){const b=portalNode('button',undefined,'portal-notice-listitem');b.append(portalNode('strong',x.title||'공지사항'),portalNode('small',portalNoticeDate(x.date||x.createdAt),'muted'));b.onclick=()=>portalNoticeDetail(x,()=>portalNavigate('home'));box.append(b);}else box.append(portalItem(x.title||x.unit||'수업',x.date||'',x.content||x.name||''))});const b=portalNode('button','전체 보기','smallbtn');b.onclick=()=>portalNavigate(target);box.append(b)});return;
   }
   const r=await portalApi(kind);box.replaceChildren(portalNode('h3',PORTAL_MENUS.find(x=>x[0]===kind)?.[1]||''));
+  if(kind==='notices'){portalNoticeList(box,r.items);return;}
   if(kind==='questions'||kind==='feedbacks')portalForm(box,kind);
   if(!r.items.length)box.append(portalNode('p','표시할 내역이 없습니다.'));
   r.items.forEach(x=>{
