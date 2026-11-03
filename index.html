@@ -151,7 +151,7 @@ async function loadQuizzes(){
  const box=$('quizList');box.textContent='공개 퀴즈를 불러오는 중...';
  try{const res=await fetch(API+'/api/quizzes',{headers:{Authorization:'Bearer '+token}});const r=await res.json();if(!r.ok)throw Error(r.error||'퀴즈 조회 실패');box.replaceChildren();
  if(!r.quizzes.length){box.textContent='현재 공개된 퀴즈가 없습니다.';return;}
- for(const q of r.quizzes){const d=document.createElement('div');d.className='quizcard';const h=document.createElement('strong');h.textContent=q.title;const p=document.createElement('p');p.className='info';p.textContent=[q.unit,q.questionCount+'문항',q.startMode,q.gameMode].filter(Boolean).join(' · ');const b=document.createElement('button');b.textContent='퀴즈 시작';b.onclick=()=>openLiveWaiting9(q);d.append(h,p,b);box.append(d);}
+ for(const q of r.quizzes){const d=document.createElement('div');d.className='quizcard';const h=document.createElement('strong');h.textContent=q.title;const p=document.createElement('p');p.className='info';p.textContent=[q.unit,q.questionCount+'문항','진행 방식은 선생님이 결정'].filter(Boolean).join(' · ');const b=document.createElement('button');b.textContent='퀴즈 시작';b.onclick=()=>openLiveWaiting9(q);d.append(h,p,b);box.append(d);}
  }catch(e){box.textContent='퀴즈 목록을 불러오지 못했습니다.';msg(e.message,true)}
 }
 let livePoll9=null,liveOpening9=false;
@@ -161,7 +161,7 @@ async function openLiveWaiting9(q){
  stopLive9();liveOpening9=false;
  const box=$('quizDetail');box.classList.remove('hidden');$('quizPlay').classList.add('hidden');box.replaceChildren();
  const h=document.createElement('h3');h.textContent=q.title+' · 대기실';
- const p=document.createElement('p');p.className='info';p.textContent='선생님이 시작 버튼을 누를 때까지 기다려 주세요.';
+ const p=document.createElement('p');p.className='info';p.textContent='대기실 입장 요청 중...';
  const close=document.createElement('button');close.textContent='대기실 나가기';close.onclick=()=>{stopLive9();box.classList.add('hidden');};
  box.append(h,p,close);box.scrollIntoView({behavior:'smooth',block:'start'});
  const update=async()=>{
@@ -177,7 +177,13 @@ async function openLiveWaiting9(q){
    p.textContent=data.gameMode==='골든벨'?'골든벨 진행은 아직 연결되지 않았습니다. 선생님께 문의해 주세요.':'선생님이 시작 버튼을 누를 때까지 기다려 주세요.';
   }catch(e){p.textContent='대기 상태 확인 중 오류: '+e.message;}
  };
- await update();if(!liveOpening9)livePoll9=setInterval(update,2000);
+ try{
+  const res=await fetch(API+'/api/live-join',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({quizId:q.quizId})});
+  const joined=await res.json();if(!joined.ok)throw Error(joined.error||'대기실 입장 실패');
+  p.textContent='대기실에 입장했습니다. 선생님이 시작할 때까지 기다려 주세요.';
+  await update();if(!liveOpening9)livePoll9=setInterval(update,2000);
+ }catch(e){p.textContent='대기실에 입장하지 못했습니다: '+e.message;msg(e.message,true);}
+
 }
 async function previewQuiz(quizId){
  const box=$('quizDetail');box.classList.remove('hidden');box.textContent='문항을 불러오는 중...';
