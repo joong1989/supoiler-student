@@ -194,11 +194,24 @@ async function previewQuiz(quizId){
 }
 
 
+// LIVE 재접속 복원: 같은 브라우저의 제출 완료 문항과 응시권을 보관합니다.
+function liveSaveKey(quizId){return 'supoiler_live_resume_v1_'+String(quizId)+'_'+String(token||'').slice(-28);}
+function liveReadSaved(quizId){try{const data=JSON.parse(localStorage.getItem(liveSaveKey(quizId))||'null');if(!data||data.quizId!==quizId||!data.ticket||!Array.isArray(data.answers)||!Number.isInteger(data.index)||data.index<0)return null;return data;}catch(e){return null;}}
+function liveSaveAttempt(a){try{if(!a||!a.quiz||!a.ticket)return;localStorage.setItem(liveSaveKey(a.quiz.quizId||a.quiz.id),JSON.stringify({quizId:a.quiz.quizId||a.quiz.id,ticket:a.ticket,index:a.index,answers:a.answers,updatedAt:Date.now()}));}catch(e){console.warn('이어풀기 저장 실패',e);}}
+function liveClearSaved(a){try{if(a&&a.quiz)localStorage.removeItem(liveSaveKey(a.quiz.quizId||a.quiz.id));}catch(e){}}
 async function startQuiz(quizId){
  if(activeAttempt)return msg('진행 중인 퀴즈를 먼저 마쳐 주세요.',true);
  const box=$('quizPlay');box.classList.remove('hidden');box.textContent='퀴즈를 준비하는 중...';$('quizDetail').classList.add('hidden');
  try{const res=await fetch(API+'/api/quiz-start',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({quizId})});const r=await res.json();if(!r.ok)throw Error(r.error||'퀴즈 시작 실패');if(!r.questions.length)throw Error('문항이 없습니다.');
- activeAttempt={ticket:r.ticket,quiz:r.quiz,questions:r.questions,index:0,answers:[]};renderQuestion();void syncLiveProgress94(activeAttempt);box.scrollIntoView({behavior:'smooth',block:'start'});
+ const saved=liveReadSaved(quizId);
+ let restored=false;
+ if(saved&&saved.index<=r.questions.length&&saved.answers.length===saved.index&&saved.answers.every((answer,i)=>String(answer.questionId)===String(r.questions[i].questionId))){
+   // 저장된 ticket으로 동일한 응시를 이어갑니다. 새로운 ticket으로 덮어쓰지 않습니다.
+   activeAttempt={ticket:saved.ticket,quiz:{...r.quiz,quizId},questions:r.questions,index:saved.index,answers:saved.answers};restored=true;
+ }else{activeAttempt={ticket:r.ticket,quiz:{...r.quiz,quizId},questions:r.questions,index:0,answers:[]};liveSaveAttempt(activeAttempt);}
+ if(activeAttempt.index>=activeAttempt.questions.length){await submitAttempt();return;}
+ renderQuestion();void syncLiveProgress94(activeAttempt);
+ if(restored)msg((activeAttempt.index+1)+'번 문제부터 이어서 풉니다.');box.scrollIntoView({behavior:'smooth',block:'start'});
  }catch(e){box.textContent='퀴즈를 시작하지 못했습니다. 다시 접속을 시도해 주세요.';msg(e.message,true)}
 }
 function renderQuestion(){
@@ -215,7 +228,7 @@ function renderQuestion(){
  const start=performance.now(),limit=Math.max(0,Number(q.timeLimit)||0);let done=false;
  const complete=async(timeout=false)=>{if(done)return;done=true;clearInterval(questionTimer);btn.disabled=true;const elapsed=(performance.now()-start)/1000;
  const responseTimeSec=Math.round((limit>0?Math.min(elapsed,limit):elapsed)*1000)/1000;
- a.answers.push({questionId:q.questionId,answer:timeout?'':answerInput(),responseTimeSec,timedOut:timeout});a.index++;
+ a.answers.push({questionId:q.questionId,answer:timeout?'':answerInput(),responseTimeSec,timedOut:timeout});a.index++;liveSaveAttempt(a);
  // 9.4: 답안 내용은 전송하지 않고 완료 문항 수만 교사용 LIVE에 동기화합니다.
  const progressSave=syncLiveProgress94(a);
  if(a.index<a.questions.length)renderQuestion();else {
@@ -228,7 +241,7 @@ function renderQuestion(){
 }
 async function submitAttempt(){
  const a=activeAttempt,box=$('quizPlay');box.textContent='채점 및 저장 중...';
- try{const res=await fetch(API+'/api/quiz-submit',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({ticket:a.ticket,answers:a.answers})});const r=await res.json();if(!r.ok)throw Error(r.error||'제출 실패');activeAttempt=null;box.replaceChildren();const title=document.createElement('h3');title.textContent='응시 완료';const p=document.createElement('p');p.textContent=`${r.score}점`;box.append(title,p);msg('퀴즈 결과가 저장되었습니다.');await records();}
+ try{const res=await fetch(API+'/api/quiz-submit',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({ticket:a.ticket,answers:a.answers})});const r=await res.json();if(!r.ok)throw Error(r.error||'제출 실패');liveClearSaved(a);activeAttempt=null;box.replaceChildren();const title=document.createElement('h3');title.textContent='응시 완료';const p=document.createElement('p');p.textContent=`${r.score}점`;box.append(title,p);msg('퀴즈 결과가 저장되었습니다.');await records();}
  catch(e){box.replaceChildren();const p=document.createElement('p');p.className='err';p.textContent='저장에 실패했습니다: '+e.message;const retry=document.createElement('button');retry.textContent='동일한 답안 다시 제출';retry.onclick=submitAttempt;box.append(p,retry);msg('결과가 저장되지 않았을 수 있습니다. 새 퀴즈를 시작하지 말고 재제출해 주세요.',true)}
 }
 
