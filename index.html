@@ -216,8 +216,11 @@ function renderQuestion(){
  const responseTimeSec=Math.round((limit>0?Math.min(elapsed,limit):elapsed)*1000)/1000;
  a.answers.push({questionId:q.questionId,answer:timeout?'':answerInput(),responseTimeSec,timedOut:timeout});a.index++;
  // 9.4: 답안 내용은 전송하지 않고 완료 문항 수만 교사용 LIVE에 동기화합니다.
- void syncLiveProgress94(a);
- if(a.index<a.questions.length)renderQuestion();else await submitAttempt();};
+ const progressSave=syncLiveProgress94(a);
+ if(a.index<a.questions.length)renderQuestion();else {
+   await progressSave; // 마지막 진행률 저장 후 최종 제출
+   await submitAttempt();
+ }};
  btn.onclick=()=>complete(false);
  const tick=()=>{const elapsed=(performance.now()-start)/1000;if(limit>0){const remain=Math.max(0,limit-elapsed);timer.textContent='남은 시간: '+remain.toFixed(1)+'초';if(remain<=0)complete(true);}else timer.textContent='제한시간 없음';};
  tick();questionTimer=setInterval(tick,100);
@@ -370,4 +373,3 @@ requestAnimationFrame(()=>setTimeout(startup86,0));
 </script>
 </body>
 </html>
-
