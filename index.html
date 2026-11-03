@@ -343,20 +343,20 @@ function portalForm(box,kind){const form=portalNode('form',undefined,'portal-for
  form.onsubmit=async e=>{e.preventDefault();b.disabled=true;try{const data=Object.fromEntries(new FormData(form).entries());const r=await portalApi(kind==='questions'?'question':'feedback','POST',data);msg(r.message||'저장되었습니다.');await portalLoad(kind)}catch(err){msg(err.message,true)}finally{b.disabled=false}};box.append(form);
 }
 
-// 9.6: LIVE 진행률은 순서대로 전송해 이전 문항 상태가 뒤늦게 덮어쓰지 않도록 합니다.
-let liveProgressQueue96=Promise.resolve();
+// LIVE 9.8: 각 문항 진행 정보는 독립적으로 전송합니다.
+// 이전 요청이 느려도 다음 문항 전송을 막지 않습니다.
 function syncLiveProgress94(a){
  const ticket=a.ticket,completed=a.index,total=a.questions.length;
- liveProgressQueue96=liveProgressQueue96.catch(()=>{}).then(async()=>{
-  try{
-   const res=await fetch(API+'/api/live-progress',{
-    method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
-    body:JSON.stringify({ticket,currentQuestion:completed,totalQuestions:total})
-   });
-   if(!res.ok)console.warn('LIVE 진행률 동기화 실패',res.status);
-  }catch(e){console.warn('LIVE 진행률 동기화 지연',e);}
- });
- return liveProgressQueue96;
+ const controller=new AbortController();
+ const timeout=setTimeout(()=>controller.abort(),9000);
+ return fetch(API+'/api/live-progress',{
+  method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+  body:JSON.stringify({ticket,currentQuestion:completed,totalQuestions:total}),
+  signal:controller.signal
+ }).then(async res=>{
+  if(!res.ok){let detail='';try{detail=(await res.json()).error||'';}catch(e){}
+   console.warn('LIVE 진행률 동기화 실패',res.status,detail);}
+ }).catch(e=>console.warn('LIVE 진행률 동기화 지연',e.message)).finally(()=>clearTimeout(timeout));
 }
 
 // 모든 const 초기화 이후에 자동 로그인 및 메뉴를 시작합니다.
