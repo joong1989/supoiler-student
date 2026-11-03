@@ -163,7 +163,7 @@ async function openLiveWaiting9(q){
  const h=document.createElement('h3');h.textContent=q.title+' · 대기실';
  const p=document.createElement('p');p.className='info';p.textContent='대기실 입장 요청 중...';
  const close=document.createElement('button');close.textContent='대기실 나가기';close.onclick=()=>{stopLive9();box.classList.add('hidden');};
- box.append(h,p,close);box.scrollIntoView({behavior:'smooth',block:'start'});
+ const recover=document.createElement('button');recover.textContent='진행 중인 퀴즈로 다시 입장';recover.style.marginRight='8px';recover.onclick=async()=>{if(liveOpening9)return;await update();};box.append(h,p,recover,close);box.scrollIntoView({behavior:'smooth',block:'start'});
  const update=async()=>{
   if(liveOpening9||box.classList.contains('hidden'))return;
   try{
@@ -178,11 +178,12 @@ async function openLiveWaiting9(q){
   }catch(e){p.textContent='대기 상태 확인 중 오류: '+e.message;}
  };
  try{
+  await update();if(liveOpening9)return;
   const res=await fetch(API+'/api/live-join',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({quizId:q.quizId})});
   const joined=await res.json();if(!joined.ok)throw Error(joined.error||'대기실 입장 실패');
   p.textContent='대기실에 입장했습니다. 선생님이 시작할 때까지 기다려 주세요.';
   await update();if(!liveOpening9)livePoll9=setInterval(update,2000);
- }catch(e){p.textContent='대기실에 입장하지 못했습니다: '+e.message;msg(e.message,true);}
+ }catch(e){p.textContent='입장 상태를 다시 확인하고 있습니다. 이미 시작된 퀴즈라면 자동으로 재입장합니다.';await update();if(!liveOpening9)livePoll9=setInterval(update,2000);}
 
 }
 async function previewQuiz(quizId){
@@ -198,7 +199,7 @@ async function startQuiz(quizId){
  const box=$('quizPlay');box.classList.remove('hidden');box.textContent='퀴즈를 준비하는 중...';$('quizDetail').classList.add('hidden');
  try{const res=await fetch(API+'/api/quiz-start',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({quizId})});const r=await res.json();if(!r.ok)throw Error(r.error||'퀴즈 시작 실패');if(!r.questions.length)throw Error('문항이 없습니다.');
  activeAttempt={ticket:r.ticket,quiz:r.quiz,questions:r.questions,index:0,answers:[]};renderQuestion();void syncLiveProgress94(activeAttempt);box.scrollIntoView({behavior:'smooth',block:'start'});
- }catch(e){box.textContent='퀴즈를 시작하지 못했습니다.';msg(e.message,true)}
+ }catch(e){box.textContent='퀴즈를 시작하지 못했습니다. 다시 접속을 시도해 주세요.';msg(e.message,true)}
 }
 function renderQuestion(){
  clearInterval(questionTimer);const a=activeAttempt;if(!a)return;const q=a.questions[a.index],box=$('quizPlay');box.replaceChildren();
@@ -227,7 +228,7 @@ function renderQuestion(){
 }
 async function submitAttempt(){
  const a=activeAttempt,box=$('quizPlay');box.textContent='채점 및 저장 중...';
- try{const res=await fetch(API+'/api/quiz-submit',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({ticket:a.ticket,answers:a.answers})});const r=await res.json();if(!r.ok)throw Error(r.error||'제출 실패');activeAttempt=null;box.replaceChildren();const title=document.createElement('h3');title.textContent='응시 완료';const p=document.createElement('p');p.textContent=`${r.score}점 · ${r.correct}/${r.total}문항 정답`;box.append(title,p);msg('퀴즈 결과가 저장되었습니다.');await records();}
+ try{const res=await fetch(API+'/api/quiz-submit',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({ticket:a.ticket,answers:a.answers})});const r=await res.json();if(!r.ok)throw Error(r.error||'제출 실패');activeAttempt=null;box.replaceChildren();const title=document.createElement('h3');title.textContent='응시 완료';const p=document.createElement('p');p.textContent=`${r.score}점`;box.append(title,p);msg('퀴즈 결과가 저장되었습니다.');await records();}
  catch(e){box.replaceChildren();const p=document.createElement('p');p.className='err';p.textContent='저장에 실패했습니다: '+e.message;const retry=document.createElement('button');retry.textContent='동일한 답안 다시 제출';retry.onclick=submitAttempt;box.append(p,retry);msg('결과가 저장되지 않았을 수 있습니다. 새 퀴즈를 시작하지 말고 재제출해 주세요.',true)}
 }
 
