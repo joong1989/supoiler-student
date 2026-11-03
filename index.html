@@ -215,6 +215,8 @@ function renderQuestion(){
  const complete=async(timeout=false)=>{if(done)return;done=true;clearInterval(questionTimer);btn.disabled=true;const elapsed=(performance.now()-start)/1000;
  const responseTimeSec=Math.round((limit>0?Math.min(elapsed,limit):elapsed)*1000)/1000;
  a.answers.push({questionId:q.questionId,answer:timeout?'':answerInput(),responseTimeSec,timedOut:timeout});a.index++;
+ // 9.4: 답안 내용은 전송하지 않고 완료 문항 수만 교사용 LIVE에 동기화합니다.
+ void syncLiveProgress94(a);
  if(a.index<a.questions.length)renderQuestion();else await submitAttempt();};
  btn.onclick=()=>complete(false);
  const tick=()=>{const elapsed=(performance.now()-start)/1000;if(limit>0){const remain=Math.max(0,limit-elapsed);timer.textContent='남은 시간: '+remain.toFixed(1)+'초';if(remain<=0)complete(true);}else timer.textContent='제한시간 없음';};
@@ -352,3 +354,10 @@ requestAnimationFrame(()=>setTimeout(startup86,0));
 </script>
 </body>
 </html>
+
+async function syncLiveProgress94(a){
+ try{
+  const res=await fetch(API+'/api/live-progress',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({ticket:a.ticket,currentQuestion:a.index,totalQuestions:a.questions.length})});
+  if(!res.ok)console.warn('LIVE 진행률 동기화 실패',res.status);
+ }catch(e){console.warn('LIVE 진행률 동기화 지연',e);}
+}
