@@ -197,7 +197,7 @@ async function startQuiz(quizId){
  if(activeAttempt)return msg('진행 중인 퀴즈를 먼저 마쳐 주세요.',true);
  const box=$('quizPlay');box.classList.remove('hidden');box.textContent='퀴즈를 준비하는 중...';$('quizDetail').classList.add('hidden');
  try{const res=await fetch(API+'/api/quiz-start',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({quizId})});const r=await res.json();if(!r.ok)throw Error(r.error||'퀴즈 시작 실패');if(!r.questions.length)throw Error('문항이 없습니다.');
- activeAttempt={ticket:r.ticket,quiz:r.quiz,questions:r.questions,index:0,answers:[]};renderQuestion();box.scrollIntoView({behavior:'smooth',block:'start'});
+ activeAttempt={ticket:r.ticket,quiz:r.quiz,questions:r.questions,index:0,answers:[]};renderQuestion();void syncLiveProgress94(activeAttempt);box.scrollIntoView({behavior:'smooth',block:'start'});
  }catch(e){box.textContent='퀴즈를 시작하지 못했습니다.';msg(e.message,true)}
 }
 function renderQuestion(){
@@ -343,6 +343,22 @@ function portalForm(box,kind){const form=portalNode('form',undefined,'portal-for
  form.onsubmit=async e=>{e.preventDefault();b.disabled=true;try{const data=Object.fromEntries(new FormData(form).entries());const r=await portalApi(kind==='questions'?'question':'feedback','POST',data);msg(r.message||'저장되었습니다.');await portalLoad(kind)}catch(err){msg(err.message,true)}finally{b.disabled=false}};box.append(form);
 }
 
+// 9.6: LIVE 진행률은 순서대로 전송해 이전 문항 상태가 뒤늦게 덮어쓰지 않도록 합니다.
+let liveProgressQueue96=Promise.resolve();
+function syncLiveProgress94(a){
+ const ticket=a.ticket,completed=a.index,total=a.questions.length;
+ liveProgressQueue96=liveProgressQueue96.catch(()=>{}).then(async()=>{
+  try{
+   const res=await fetch(API+'/api/live-progress',{
+    method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+    body:JSON.stringify({ticket,currentQuestion:completed,totalQuestions:total})
+   });
+   if(!res.ok)console.warn('LIVE 진행률 동기화 실패',res.status);
+  }catch(e){console.warn('LIVE 진행률 동기화 지연',e);}
+ });
+ return liveProgressQueue96;
+}
+
 // 모든 const 초기화 이후에 자동 로그인 및 메뉴를 시작합니다.
 // 8.6: 첫 화면을 먼저 그린 후 초기 네트워크 요청을 시작합니다.
 // 퀴즈/학습기록은 '퀴즈' 메뉴에 진입할 때만 불러옵니다.
@@ -355,9 +371,3 @@ requestAnimationFrame(()=>setTimeout(startup86,0));
 </body>
 </html>
 
-async function syncLiveProgress94(a){
- try{
-  const res=await fetch(API+'/api/live-progress',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({ticket:a.ticket,currentQuestion:a.index,totalQuestions:a.questions.length})});
-  if(!res.ok)console.warn('LIVE 진행률 동기화 실패',res.status);
- }catch(e){console.warn('LIVE 진행률 동기화 지연',e);}
-}
