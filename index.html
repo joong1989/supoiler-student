@@ -351,13 +351,21 @@ function startup86(){
  else {classes();}
 }
 requestAnimationFrame(()=>setTimeout(startup86,0));
+// 9.5: 문항 완료 직후 교사용 LIVE 진행률 전송. 학생 풀이를 차단하지 않습니다.
+async function syncLiveProgress94(a){
+ try{
+  const res=await fetch(API+'/api/live-progress',{
+   method:'POST',
+   headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+   body:JSON.stringify({ticket:a.ticket,currentQuestion:a.index,totalQuestions:a.questions.length})
+  });
+  if(!res.ok){
+   const body=await res.json().catch(()=>({}));
+   console.warn('LIVE 진행률 동기화 실패',res.status,body.error||'');
+  }
+ }catch(e){console.warn('LIVE 진행률 동기화 지연',e);}
+}
 </script>
 </body>
 </html>
 
-async function syncLiveProgress94(a){
- try{
-  const res=await fetch(API+'/api/live-progress',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({ticket:a.ticket,currentQuestion:a.index,totalQuestions:a.questions.length})});
-  if(!res.ok)console.warn('LIVE 진행률 동기화 실패',res.status);
- }catch(e){console.warn('LIVE 진행률 동기화 지연',e);}
-}
