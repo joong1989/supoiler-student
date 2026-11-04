@@ -195,10 +195,31 @@ async function previewQuiz(quizId){
 
 
 // LIVE 재접속 복원: 같은 브라우저의 제출 완료 문항과 응시권을 보관합니다.
-function liveSaveKey(quizId){return 'supoiler_live_resume_v1_'+String(quizId)+'_'+String(token||'').slice(-28);}
-function liveReadSaved(quizId){try{const data=JSON.parse(localStorage.getItem(liveSaveKey(quizId))||'null');if(!data||data.quizId!==quizId||!data.ticket||!Array.isArray(data.answers)||!Number.isInteger(data.index)||data.index<0)return null;return data;}catch(e){return null;}}
-function liveSaveAttempt(a){try{if(!a||!a.quiz||!a.ticket)return;localStorage.setItem(liveSaveKey(a.quiz.quizId||a.quiz.id),JSON.stringify({quizId:a.quiz.quizId||a.quiz.id,ticket:a.ticket,index:a.index,answers:a.answers,updatedAt:Date.now()}));}catch(e){console.warn('이어풀기 저장 실패',e);}}
-function liveClearSaved(a){try{if(a&&a.quiz)localStorage.removeItem(liveSaveKey(a.quiz.quizId||a.quiz.id));}catch(e){}}
+// 로그인 세션은 재로그인 때마다 변경됩니다. 저장 키에는 변하지 않는 학생 ID를 사용합니다.
+function liveStudentId(){
+ try{const part=String(token||'').split('.')[0];const base=part.replace(/-/g,'+').replace(/_/g,'/');const raw=atob(base+'='.repeat((4-base.length%4)%4));const obj=JSON.parse(raw);return String(obj.id||'');}catch(e){return '';}
+}
+function liveSaveKey(quizId){return 'supoiler_live_resume_v2_'+String(quizId)+'_'+liveStudentId();}
+function liveReadSaved(quizId){
+ try{
+  const id=liveStudentId();if(!id)return null;
+  const keys=[liveSaveKey(quizId)];
+  // 이전 버전의 세션 토큰 기반 저장도 찾아서 이어풀기를 복원합니다.
+  const oldPrefix='supoiler_live_resume_v1_'+String(quizId)+'_';
+  for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith(oldPrefix))keys.push(k);}
+  let best=null;
+  for(const k of keys){
+   let d;try{d=JSON.parse(localStorage.getItem(k)||'null');}catch(e){continue;}
+   if(!d||String(d.quizId)!==String(quizId)||!d.ticket||!Array.isArray(d.answers)||!Number.isInteger(d.index)||d.index<0||d.answers.length!==d.index)continue;
+   // 저장된 응시권의 학생 ID가 현재 로그인한 학생과 일치해야 합니다.
+   try{const part=String(d.ticket).split('.')[0];const base=part.replace(/-/g,'+').replace(/_/g,'/');const raw=atob(base+'='.repeat((4-base.length%4)%4));const t=JSON.parse(raw);if(String(t.id)!==id||String(t.quizId)!==String(quizId)||Number(t.exp)<=Date.now())continue;}catch(e){continue;}
+   if(!best||d.index>best.index||(d.index===best.index&&Number(d.updatedAt)>Number(best.updatedAt)))best=d;
+  }
+  return best;
+ }catch(e){console.warn('이어풀기 읽기 실패',e);return null;}
+}
+function liveSaveAttempt(a){try{if(!a||!a.quiz||!a.ticket)return;const quizId=a.quiz.quizId||a.quiz.id;localStorage.setItem(liveSaveKey(quizId),JSON.stringify({quizId,ticket:a.ticket,index:a.index,answers:a.answers,updatedAt:Date.now()}));}catch(e){console.warn('이어풀기 저장 실패',e);}}
+function liveClearSaved(a){try{if(!a||!a.quiz)return;const quizId=a.quiz.quizId||a.quiz.id;localStorage.removeItem(liveSaveKey(quizId));const prefix='supoiler_live_resume_v1_'+String(quizId)+'_';for(let i=localStorage.length-1;i>=0;i--){const k=localStorage.key(i);if(k&&k.startsWith(prefix))localStorage.removeItem(k);}}catch(e){}}
 async function startQuiz(quizId){
  if(activeAttempt)return msg('진행 중인 퀴즈를 먼저 마쳐 주세요.',true);
  const box=$('quizPlay');box.classList.remove('hidden');box.textContent='퀴즈를 준비하는 중...';$('quizDetail').classList.add('hidden');
@@ -207,7 +228,7 @@ async function startQuiz(quizId){
  let restored=false;
  if(saved&&saved.index<=r.questions.length&&saved.answers.length===saved.index&&saved.answers.every((answer,i)=>String(answer.questionId)===String(r.questions[i].questionId))){
    // 저장된 ticket으로 동일한 응시를 이어갑니다. 새로운 ticket으로 덮어쓰지 않습니다.
-   activeAttempt={ticket:saved.ticket,quiz:{...r.quiz,quizId},questions:r.questions,index:saved.index,answers:saved.answers};restored=true;
+   activeAttempt={ticket:saved.ticket,quiz:{...r.quiz,quizId},questions:r.questions,index:saved.index,answers:saved.answers};restored=true;liveSaveAttempt(activeAttempt);
  }else{activeAttempt={ticket:r.ticket,quiz:{...r.quiz,quizId},questions:r.questions,index:0,answers:[]};liveSaveAttempt(activeAttempt);}
  if(activeAttempt.index>=activeAttempt.questions.length){await submitAttempt();return;}
  renderQuestion();void syncLiveProgress94(activeAttempt);
