@@ -174,7 +174,7 @@ async function openLiveWaiting9(q){
    const data=await res.json();if(!data.ok)throw Error(data.error||'조회 실패');
    if(data.state==='진행중'&&data.startMode==='함께 시작'&&data.gameMode==='레이스'){
     liveOpening9=true;stopLive9();p.textContent='선생님이 퀴즈를 시작했습니다. 문제를 불러오는 중...';
-    const started=await startQuiz(q.quizId);if(!started){liveOpening9=false;p.textContent='서버가 혼잡하여 시작이 지연되고 있습니다. 자동으로 다시 시도합니다.';if(!livePoll9)livePoll9=setInterval(update,3500);}return;
+    const started=await startQuiz(q.quizId);if(!started){liveOpening9=false;p.textContent='서버가 혼잡하여 시작이 지연되고 있습니다. 자동으로 다시 시도합니다.';if(!livePoll9)livePoll9=setInterval(update,5000);}return;
    }
    if(data.state==='종료'){p.textContent='선생님이 퀴즈를 종료했습니다.';stopLive9();return;}
    p.textContent=data.gameMode==='골든벨'?'골든벨 진행은 아직 연결되지 않았습니다. 선생님께 문의해 주세요.':'선생님이 시작 버튼을 누를 때까지 기다려 주세요.';
@@ -185,8 +185,8 @@ async function openLiveWaiting9(q){
   const res=await fetch(API+'/api/live-join',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({quizId:q.quizId})});
   const joined=await res.json();if(!joined.ok)throw Error(joined.error||'대기실 입장 실패');
   p.textContent='대기실에 입장했습니다. 선생님이 시작할 때까지 기다려 주세요.';
-  await update();if(!liveOpening9)livePoll9=setInterval(update,3500);
- }catch(e){p.textContent='입장 상태를 다시 확인하고 있습니다. 이미 시작된 퀴즈라면 자동으로 재입장합니다.';await update();if(!liveOpening9)livePoll9=setInterval(update,3500);}
+  await update();if(!liveOpening9)livePoll9=setInterval(update,5000);
+ }catch(e){p.textContent='입장 상태를 다시 확인하고 있습니다. 이미 시작된 퀴즈라면 자동으로 재입장합니다.';await update();if(!liveOpening9)livePoll9=setInterval(update,5000);}
 
 }
 async function previewQuiz(quizId){
@@ -199,7 +199,7 @@ async function previewQuiz(quizId){
 
 // LIVE 11.0: 답안은 현재 LIVE 세션에 한해 서버에서 복원합니다.
 async function startQuiz(quizId){
- if(activeAttempt)return msg('진행 중인 퀴즈를 먼저 마쳐 주세요.',true);
+ if(activeAttempt)return true;
  const box=$('quizPlay');box.classList.remove('hidden');box.textContent='서버에서 진행 기록을 확인하는 중...';$('quizDetail').classList.add('hidden');
  try{
   const res=await fetch(API+'/api/quiz-start',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({quizId})});
@@ -212,7 +212,8 @@ async function startQuiz(quizId){
   renderQuestion();void syncLiveProgress94(activeAttempt);
   if(activeAttempt.index)msg((activeAttempt.index+1)+'번 문제부터 이어서 풉니다.');
   box.scrollIntoView({behavior:'smooth',block:'start'});
- }catch(e){activeAttempt=null;box.textContent='퀴즈를 시작하지 못했습니다. 다시 접속을 시도해 주세요.';msg(e.message,true);}
+  return true;
+ }catch(e){activeAttempt=null;box.classList.add('hidden');$('quizDetail').classList.remove('hidden');box.textContent='퀴즈 시작이 지연되고 있습니다. 대기실에서 자동으로 다시 시도합니다.';msg(e.message,true);return false;}
 }
 function renderQuestion(){
  clearInterval(questionTimer);const a=activeAttempt;if(!a)return;const q=a.questions[a.index],box=$('quizPlay');box.replaceChildren();
