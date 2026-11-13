@@ -141,10 +141,10 @@ async function showReview(resultId,container){
  r.items.forEach(item=>{const card=document.createElement('div');card.className='review '+(item.correct?'good':'bad');const h=document.createElement('strong');h.textContent=item.number+'번 · '+(item.correct?'정답':'오답')+(item.timedOut?' (시간 초과)':'');const q=document.createElement('p');mathText(q,item.question);const a=document.createElement('p');mathText(a,'내 답: '+item.myAnswer);card.append(h,q,a);if(!item.correct){const c=document.createElement('p');mathText(c,'정답: '+item.correctAnswer);card.append(c)}container.append(card)});
  }catch(e){container.textContent='오답 확인 실패: '+e.message}
 }
-async function records(){try{const res=await fetch(API+'/api/my-record',{headers:{Authorization:'Bearer '+token}}),r=await res.json();if(!r.ok){if(res.status===401)showLogin();throw Error(r.error||'기록 조회 실패')};$('who').textContent=r.student.className+' '+r.student.name;const box=$('records');box.replaceChildren();const s=document.createElement('div');s.className='stat';s.textContent=`참여 ${r.summary.count}회 · 평균 ${r.summary.avgScore}점 · 정답률 ${r.summary.correctRate}%`;box.append(s);
+async function records(){try{const res=await fetch(API+'/api/my-record',{headers:{Authorization:'Bearer '+token}}),r=await res.json();if(!r.ok){if(res.status===401){msg('인증 확인에 실패했습니다. 일시적인 오류일 수 있으니 다시 시도해 주세요.',true);return;}throw Error(r.error||'기록 조회 실패')};$('who').textContent=r.student.className+' '+r.student.name;const box=$('records');box.replaceChildren();const s=document.createElement('div');s.className='stat';s.textContent=`참여 ${r.summary.count}회 · 평균 ${r.summary.avgScore}점 · 정답률 ${r.summary.correctRate}%`;box.append(s);
  if(r.quizzes.length){makeChart(box,r.quizzes,'점수 변화 (최근 10회)','score');makeChart(box,r.quizzes,'정답률 변화 (최근 10회)','rate')}
  for(const q of r.quizzes){const d=document.createElement('div');d.className='quiz';const text=document.createElement('div');text.textContent=`${q.date} · ${q.title} · ${q.score}점 (${q.correct}/${q.total} 정답, 오답 ${q.wrong}개)`;const b=document.createElement('button');b.className='smallbtn';b.textContent='문항별 결과 확인';const detail=document.createElement('div');detail.className='detailbox hidden';b.onclick=async()=>{if(!detail.classList.contains('hidden')){detail.classList.add('hidden');b.textContent='문항별 결과 확인';return;}detail.classList.remove('hidden');b.textContent='결과 접기';await showReview(q.resultId,detail)};d.append(text,b,detail);box.append(d)}if(!r.quizzes.length){const p=document.createElement('p');p.textContent='아직 참여한 퀴즈가 없습니다.';box.append(p)}}catch(e){msg(e.message,true)}}
-$('loginBtn').onclick=async()=>{const className=$('cls').value,name=$('name').value.trim(),pin=$('pin').value;if(!className||!name||!/^[0-9]{4}$/.test(pin))return msg('학년반, 이름, 숫자 4자리 PIN을 입력해 주세요.',true);$('loginBtn').disabled=true;msg('확인 중...');try{const res=await fetch(API+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({className,name,pin})}),r=await res.json();if(!r.ok)throw Error(r.error||'로그인 실패');token=r.session;sessionStorage.setItem('supoiler_session5',token);$('login').classList.add('hidden');$('account').classList.remove('hidden');msg(r.created?'계정이 생성되었습니다.':'로그인되었습니다.');window._quiz86Loaded=false;portalInit();records()}catch(e){msg(e.message,true)}finally{$('loginBtn').disabled=false}};
+$('loginBtn').onclick=async()=>{const className=$('cls').value,name=$('name').value.trim(),pin=$('pin').value;if(!className||!name||!/^[0-9]{4}$/.test(pin))return msg('학년반, 이름, 숫자 4자리 PIN을 입력해 주세요.',true);$('loginBtn').disabled=true;msg('확인 중...');try{const r=await liveJson9(API+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({className,name,pin})},3);if(!r.ok)throw Error(r.error||'로그인 실패');token=r.session;sessionStorage.setItem('supoiler_session5',token);$('login').classList.add('hidden');$('account').classList.remove('hidden');msg(r.created?'계정이 생성되었습니다.':'로그인되었습니다.');window._quiz86Loaded=false;portalInit();records()}catch(e){msg(e.message,true)}finally{$('loginBtn').disabled=false}};
 $('logout').onclick=()=>{if(activeAttempt){msg('진행 중인 퀴즈를 마친 뒤 로그아웃해 주세요.',true);return;}showLogin();window._quiz86Loaded=false;classes();msg('로그아웃되었습니다.')};// 초기 실행은 포털 상수 및 함수 선언이 완료된 후 수행합니다.
 
 async function loadQuizzes(){
@@ -154,7 +154,10 @@ async function loadQuizzes(){
  for(const q of r.quizzes){const d=document.createElement('div');d.className='quizcard';const h=document.createElement('strong');h.textContent=q.title;const p=document.createElement('p');p.className='info';p.textContent=[q.unit,q.questionCount+'문항','진행 방식은 선생님이 결정'].filter(Boolean).join(' · ');const b=document.createElement('button');b.textContent='퀴즈 시작';b.onclick=()=>openLiveWaiting9(q);d.append(h,p,b);box.append(d);}
  }catch(e){box.textContent='퀴즈 목록을 불러오지 못했습니다.';msg(e.message,true)}
 }
-let livePoll9=null,liveOpening9=false;
+let livePoll9=null,liveOpening9=false,liveUpdating9=false;
+const livePause9=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+function liveTransient9(e){return /Request rejected|fetch|network|timeout|시간 초과|서버|일시|연결|429|502|503|504|응답/i.test(String(e&&e.message||e));}
+async function liveJson9(url,options={},tries=2){let last;for(let i=0;i<tries;i++){try{const res=await fetch(url,options);let data;try{data=await res.json();}catch(e){throw Error('서버 응답을 읽을 수 없습니다 ('+res.status+')');}if(!res.ok||!data.ok){const err=Error(data.error||'요청 실패 ('+res.status+')');err.status=res.status;if(res.status===429||res.status>=500)throw err;return data;}return data;}catch(e){last=e;if(i===tries-1||e.status===401||e.status===403||(!liveTransient9(e)&&e.status!==429&&!(e.status>=500)))throw e;await livePause9(900+Math.random()*1500+i*1000);}}throw last;}
 function stopLive9(){if(livePoll9){clearInterval(livePoll9);livePoll9=null;}}
 async function openLiveWaiting9(q){
  if(activeAttempt)return msg('진행 중인 퀴즈를 먼저 마쳐 주세요.',true);
@@ -165,25 +168,25 @@ async function openLiveWaiting9(q){
  const close=document.createElement('button');close.textContent='대기실 나가기';close.onclick=()=>{stopLive9();box.classList.add('hidden');};
  const recover=document.createElement('button');recover.textContent='진행 중인 퀴즈로 다시 입장';recover.style.marginRight='8px';recover.onclick=async()=>{if(liveOpening9)return;await update();};box.append(h,p,recover,close);box.scrollIntoView({behavior:'smooth',block:'start'});
  const update=async()=>{
-  if(liveOpening9||box.classList.contains('hidden'))return;
+  if(liveOpening9||liveUpdating9||box.classList.contains('hidden'))return;liveUpdating9=true;
   try{
    const res=await fetch(API+'/api/live-status/'+encodeURIComponent(q.quizId),{headers:{Authorization:'Bearer '+token},cache:'no-store'});
    const data=await res.json();if(!data.ok)throw Error(data.error||'조회 실패');
    if(data.state==='진행중'&&data.startMode==='함께 시작'&&data.gameMode==='레이스'){
     liveOpening9=true;stopLive9();p.textContent='선생님이 퀴즈를 시작했습니다. 문제를 불러오는 중...';
-    await startQuiz(q.quizId);return;
+    const started=await startQuiz(q.quizId);if(!started){liveOpening9=false;p.textContent='서버가 혼잡하여 시작이 지연되고 있습니다. 자동으로 다시 시도합니다.';if(!livePoll9)livePoll9=setInterval(update,3500);}return;
    }
    if(data.state==='종료'){p.textContent='선생님이 퀴즈를 종료했습니다.';stopLive9();return;}
    p.textContent=data.gameMode==='골든벨'?'골든벨 진행은 아직 연결되지 않았습니다. 선생님께 문의해 주세요.':'선생님이 시작 버튼을 누를 때까지 기다려 주세요.';
-  }catch(e){p.textContent='대기 상태 확인 중 오류: '+e.message;}
+  }catch(e){p.textContent='대기 상태 확인이 지연되고 있습니다: '+e.message;}finally{liveUpdating9=false;}
  };
  try{
   await update();if(liveOpening9)return;
   const res=await fetch(API+'/api/live-join',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({quizId:q.quizId})});
   const joined=await res.json();if(!joined.ok)throw Error(joined.error||'대기실 입장 실패');
   p.textContent='대기실에 입장했습니다. 선생님이 시작할 때까지 기다려 주세요.';
-  await update();if(!liveOpening9)livePoll9=setInterval(update,2000);
- }catch(e){p.textContent='입장 상태를 다시 확인하고 있습니다. 이미 시작된 퀴즈라면 자동으로 재입장합니다.';await update();if(!liveOpening9)livePoll9=setInterval(update,2000);}
+  await update();if(!liveOpening9)livePoll9=setInterval(update,3500);
+ }catch(e){p.textContent='입장 상태를 다시 확인하고 있습니다. 이미 시작된 퀴즈라면 자동으로 재입장합니다.';await update();if(!liveOpening9)livePoll9=setInterval(update,3500);}
 
 }
 async function previewQuiz(quizId){
