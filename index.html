@@ -202,16 +202,16 @@ async function startQuiz(quizId){
  if(activeAttempt)return true;
  const box=$('quizPlay');box.classList.remove('hidden');box.textContent='서버에서 진행 기록을 확인하는 중...';$('quizDetail').classList.add('hidden');
  try{
-  // v18: 시작 요청이 멈추면 12초 후 중단하고 대기실에서 다시 시도합니다.
+  // v18: 시작 요청이 멈추면 35초 후 중단하고 대기실에서 다시 시도합니다.
   // 서버 측에서 이미 시작된 응시를 재사용하는지 Worker에서 반드시 확인해야 합니다.
   const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),12000);
+  const timeout=setTimeout(()=>controller.abort(),35000);
   let r;
   try{
    const res=await fetch(API+'/api/quiz-start',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({quizId}),signal:controller.signal,cache:'no-store'});
    if(!res.ok)throw Error('퀴즈 시작 요청 실패 (HTTP '+res.status+')');
    r=await res.json();
-  }catch(e){if(e.name==='AbortError')throw Error('퀴즈 시작 응답 시간 초과 (12초)');throw e;}
+  }catch(e){if(e.name==='AbortError')throw Error('퀴즈 시작 응답 시간 초과 (35초)');throw e;}
   finally{clearTimeout(timeout);}
   if(!r.ok)throw Error(r.error||'퀴즈 시작 실패');if(!Array.isArray(r.questions)||!r.questions.length)throw Error('문항이 없습니다.');
   const answers=r.checkpoint;
