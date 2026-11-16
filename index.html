@@ -126,7 +126,7 @@ function mathText(element,raw){
 let activeAttempt=null,questionTimer=null;
 const API='https://supoiler-student-api.joong1989.workers.dev';const $=id=>document.getElementById(id);let token=sessionStorage.getItem('supoiler_session5')||'';
 function msg(s,err=false){$('msg').textContent=s;$('msg').className=err?'err':'ok'}
-function showLogin(){token='';sessionStorage.removeItem('supoiler_session5');$('account').classList.add('hidden');$('login').classList.remove('hidden');$('pin').value='';}
+function showLogin(){stopLive9();token='';sessionStorage.removeItem('supoiler_session5');$('account').classList.add('hidden');$('login').classList.remove('hidden');$('pin').value='';}
 async function classes(){try{const r=await(await fetch(API+'/api/classes')).json();if(!r.ok)throw Error();$('cls').replaceChildren(new Option('학년반 선택',''),...r.classes.map(x=>new Option(x,x)));}catch{$('cls').replaceChildren(new Option('학년반을 불러오지 못했습니다',''));msg('서버 연결을 확인해 주세요.',true)}}
 function makeChart(box,quizzes,title,kind){
  const chart=document.createElement('section');chart.className='chart';const h=document.createElement('h4');h.textContent=title;chart.append(h);
@@ -154,41 +154,100 @@ async function loadQuizzes(){
  for(const q of r.quizzes){const d=document.createElement('div');d.className='quizcard';const h=document.createElement('strong');h.textContent=q.title;const p=document.createElement('p');p.className='info';p.textContent=[q.unit,q.questionCount+'문항','진행 방식은 선생님이 결정'].filter(Boolean).join(' · ');const b=document.createElement('button');b.textContent='퀴즈 시작';b.onclick=()=>openLiveWaiting9(q);d.append(h,p,b);box.append(d);}
  }catch(e){box.textContent='퀴즈 목록을 불러오지 못했습니다.';msg(e.message,true)}
 }
-let livePoll9=null,liveOpening9=false,liveUpdating9=false;
+// v19: 대기실마다 독립된 요청·타이머를 사용하고 화면을 떠나면 취소합니다.
+let livePoll9=null,liveOpening9=false,liveUpdating9=false,liveRoom19=null;
 const livePause9=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function liveTransient9(e){return /Request rejected|fetch|network|timeout|시간 초과|서버|일시|연결|429|502|503|504|응답/i.test(String(e&&e.message||e));}
 async function liveJson9(url,options={},tries=2){let last;for(let i=0;i<tries;i++){try{const res=await fetch(url,options);let data;try{data=await res.json();}catch(e){throw Error('서버 응답을 읽을 수 없습니다 ('+res.status+')');}if(!res.ok||!data.ok){const err=Error(data.error||'요청 실패 ('+res.status+')');err.status=res.status;if(res.status===429||res.status>=500)throw err;return data;}return data;}catch(e){last=e;if(i===tries-1||e.status===401||e.status===403||(!liveTransient9(e)&&e.status!==429&&!(e.status>=500)))throw e;await livePause9(900+Math.random()*1500+i*1000);}}throw last;}
-function stopLive9(){if(livePoll9){clearInterval(livePoll9);livePoll9=null;}}
+function liveCurrent19(room){return !!room&&liveRoom19===room&&!room.closed;}
+function stopLive9(){
+ const room=liveRoom19;
+ if(room){room.closed=true;clearTimeout(room.timer);for(const controller of room.controllers)controller.abort();
+  if(room.opening&&!activeAttempt){$('quizPlay').classList.add('hidden');}}
+ liveRoom19=null;livePoll9=null;liveOpening9=false;liveUpdating9=false;
+}
+async function liveRequest19(path,options,room,timeoutMs=30000){
+ if(!liveCurrent19(room))throw Object.assign(Error('대기실을 나갔습니다.'),{name:'AbortError'});
+ const controller=new AbortController();room.controllers.add(controller);
+ let timedOut=false,timer,abortListener;
+ const cancelled=new Promise((_,reject)=>{
+  abortListener=()=>reject(Object.assign(Error(timedOut?'응답 시간 초과. 다시 확인합니다.':'대기실을 나갔습니다.'),{name:timedOut?'TimeoutError':'AbortError'}));
+  controller.signal.addEventListener('abort',abortListener,{once:true});
+  timer=setTimeout(()=>{timedOut=true;controller.abort();},timeoutMs);
+ });
+ try{
+  return await Promise.race([cancelled,(async()=>{
+   const res=await fetch(API+path,{...options,signal:controller.signal,cache:'no-store'});
+   let data;try{data=await res.json();}catch(e){if(controller.signal.aborted)throw e;throw Error('서버 응답을 읽을 수 없습니다 ('+res.status+')');}
+   if(!liveCurrent19(room))throw Object.assign(Error('대기실을 나갔습니다.'),{name:'AbortError'});
+   if(!res.ok||!data.ok)throw Object.assign(Error(data.error||'요청 실패 ('+res.status+')'),{status:res.status,code:data.code||''});
+   return data;
+  })()]);
+ }finally{clearTimeout(timer);controller.signal.removeEventListener('abort',abortListener);room.controllers.delete(controller);}
+}
 async function openLiveWaiting9(q){
  if(activeAttempt)return msg('진행 중인 퀴즈를 먼저 마쳐 주세요.',true);
- stopLive9();liveOpening9=false;
+ // 같은 대기실 연속 클릭은 요청을 중복해서 보내지 않습니다.
+ if(liveCurrent19(liveRoom19)&&liveRoom19.quizId===q.quizId&&!liveRoom19.finished&&!liveRoom19.blocked)return;
+ stopLive9();
+ const room={quizId:q.quizId,closed:false,busy:false,opening:false,joinedSession:'',controllers:new Set(),timer:null,failures:0,blocked:false,finished:false};
+ liveRoom19=room;
  const box=$('quizDetail');box.classList.remove('hidden');$('quizPlay').classList.add('hidden');box.replaceChildren();
  const h=document.createElement('h3');h.textContent=q.title+' · 대기실';
  const p=document.createElement('p');p.className='info';p.textContent='대기실 입장 요청 중...';
- const close=document.createElement('button');close.textContent='대기실 나가기';close.onclick=()=>{stopLive9();box.classList.add('hidden');};
- const recover=document.createElement('button');recover.textContent='진행 중인 퀴즈로 다시 입장';recover.style.marginRight='8px';recover.onclick=async()=>{if(liveOpening9)return;await update();};box.append(h,p,recover,close);box.scrollIntoView({behavior:'smooth',block:'start'});
- const update=async()=>{
-  if(liveOpening9||liveUpdating9||box.classList.contains('hidden'))return;liveUpdating9=true;
-  try{
-   const res=await fetch(API+'/api/live-status/'+encodeURIComponent(q.quizId),{headers:{Authorization:'Bearer '+token},cache:'no-store'});
-   const data=await res.json();if(!data.ok)throw Error(data.error||'조회 실패');
-   if(data.state==='진행중'&&data.startMode==='함께 시작'&&data.gameMode==='레이스'){
-    liveOpening9=true;stopLive9();p.textContent='선생님이 퀴즈를 시작했습니다. 문제를 불러오는 중...';
-    const started=await startQuiz(q.quizId);if(!started){liveOpening9=false;p.textContent='서버가 혼잡하여 시작이 지연되고 있습니다. 자동으로 다시 시도합니다.';if(!livePoll9)livePoll9=setInterval(update,5000);}return;
-   }
-   if(data.state==='종료'){p.textContent='선생님이 퀴즈를 종료했습니다.';stopLive9();return;}
-   p.textContent=data.gameMode==='골든벨'?'골든벨 진행은 아직 연결되지 않았습니다. 선생님께 문의해 주세요.':'선생님이 시작 버튼을 누를 때까지 기다려 주세요.';
-  }catch(e){p.textContent='대기 상태 확인이 지연되고 있습니다: '+e.message;}finally{liveUpdating9=false;}
+ const close=document.createElement('button');close.textContent='대기실 나가기';close.onclick=()=>{if(!liveCurrent19(room))return;stopLive9();box.classList.add('hidden');};
+ const recover=document.createElement('button');recover.textContent='진행 중인 퀴즈로 다시 입장';recover.style.marginRight='8px';
+ const schedule=()=>{
+  if(!liveCurrent19(room)||room.opening||room.blocked||room.finished)return;
+  clearTimeout(room.timer);
+  const delay=Math.min(15000,5000+room.failures*2000)+Math.floor(Math.random()*1000);
+  room.timer=setTimeout(()=>{room.timer=null;livePoll9=null;void update();},delay);livePoll9=room.timer;
  };
- try{
-  await update();if(liveOpening9)return;
-  const res=await fetch(API+'/api/live-join',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({quizId:q.quizId})});
-  const joined=await res.json();if(!joined.ok)throw Error(joined.error||'대기실 입장 실패');
-  p.textContent='대기실에 입장했습니다. 선생님이 시작할 때까지 기다려 주세요.';
-  await update();if(!liveOpening9)livePoll9=setInterval(update,5000);
- }catch(e){p.textContent='입장 상태를 다시 확인하고 있습니다. 이미 시작된 퀴즈라면 자동으로 재입장합니다.';await update();if(!liveOpening9)livePoll9=setInterval(update,5000);}
-
+ const update=async()=>{
+  if(!liveCurrent19(room)||room.busy||room.opening)return;
+  clearTimeout(room.timer);room.timer=null;livePoll9=null;room.busy=true;liveUpdating9=true;
+  try{
+   const data=await liveRequest19('/api/live-status/'+encodeURIComponent(q.quizId),{headers:{Authorization:'Bearer '+token}},room);
+   if(!liveCurrent19(room))return;
+   if(data.state==='종료'){p.textContent='선생님이 퀴즈를 종료했습니다.';room.finished=true;return;}
+   if(data.startMode!=='함께 시작'||data.gameMode!=='레이스'){
+    p.textContent=data.gameMode==='골든벨'?'골든벨 진행은 아직 연결되지 않았습니다. 선생님께 문의해 주세요.':'선생님이 함께 시작·레이스 대기실을 열 때까지 기다려 주세요.';return;
+   }
+   if(data.state==='진행중'){
+    room.opening=true;liveOpening9=true;p.textContent='선생님이 퀴즈를 시작했습니다. 문제를 불러오는 중...';
+    const started=await startQuiz(q.quizId,room);
+    if(!liveCurrent19(room))return;
+    room.opening=false;liveOpening9=false;
+    if(started){room.finished=true;box.classList.add('hidden');return;}
+    if(!room.blocked){room.failures++;p.textContent='시작 응답이 지연되고 있어요. 자동으로 다시 시도합니다.';}
+    else p.textContent='퀴즈 시작을 확인하지 못했어요. 아래 오류를 선생님께 알려 주세요. 확인 후 다시 입장할 수 있어요.';
+    return;
+   }
+   if(data.state==='대기'&&room.joinedSession!==data.sessionId){
+    if(!data.sessionId)throw Error('대기실 세션을 확인할 수 없습니다.');
+    p.textContent='대기실 입장을 확인하는 중...';
+    const joined=await liveRequest19('/api/live-join',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({quizId:q.quizId})},room);
+    if(!liveCurrent19(room))return;
+    if(!joined.sessionId||joined.sessionId!==data.sessionId)throw Error('대기실 상태가 변경되었습니다. 다시 확인합니다.');
+    room.joinedSession=joined.sessionId;
+   }
+   room.failures=0;p.textContent=room.joinedSession===data.sessionId?'대기실에 입장했습니다. 선생님이 시작할 때까지 기다려 주세요.':'선생님이 대기실을 열 때까지 기다려 주세요.';
+  }catch(e){
+   if(!liveCurrent19(room))return;
+   room.failures++;
+   if(e.status===401){room.blocked=true;p.textContent='로그인 정보가 만료되었습니다. 다시 로그인해 주세요.';msg(e.message,true);}
+    else if(e.status===403){room.blocked=true;p.textContent='현재 퀴즈에 참여할 수 없습니다. 선생님께 문의하거나 아래 버튼으로 다시 확인해 주세요.';msg(e.message,true);}
+   else p.textContent='대기실 연결을 다시 확인하고 있어요. '+e.message;
+  }finally{
+   room.busy=false;
+   if(liveCurrent19(room)){liveUpdating9=false;schedule();}
+  }
+ };
+ recover.onclick=()=>{if(!liveCurrent19(room)||room.busy||room.opening)return;room.blocked=false;room.finished=false;room.failures=0;void update();};
+ box.append(h,p,recover,close);box.scrollIntoView({behavior:'smooth',block:'start'});
+ await update();
 }
+
 async function previewQuiz(quizId){
  const box=$('quizDetail');box.classList.remove('hidden');box.textContent='문항을 불러오는 중...';
  try{const res=await fetch(API+'/api/quizzes/'+encodeURIComponent(quizId),{headers:{Authorization:'Bearer '+token}});const r=await res.json();if(!r.ok)throw Error(r.error||'문항 조회 실패');box.replaceChildren();const h=document.createElement('h3');h.textContent=r.quiz.title;box.append(h);const p=document.createElement('p');p.className='info';p.textContent='6A단계: 문항 확인만 가능합니다. 답안 제출과 점수 저장은 다음 단계에서 연결합니다.';box.append(p);
@@ -198,33 +257,30 @@ async function previewQuiz(quizId){
 
 
 // LIVE 11.0: 답안은 현재 LIVE 세션에 한해 서버에서 복원합니다.
-async function startQuiz(quizId){
- if(activeAttempt)return true;
+// v19: 시작 요청도 해당 대기실에 연결하고, 취소된 화면에서는 응시를 만들지 않습니다.
+async function startQuiz(quizId,room=liveRoom19){
+ if(!liveCurrent19(room))return false;
+ if(activeAttempt)return activeAttempt.quiz.quizId===quizId;
  const box=$('quizPlay');box.classList.remove('hidden');box.textContent='서버에서 진행 기록을 확인하는 중...';$('quizDetail').classList.add('hidden');
  try{
-  // v18: 시작 요청이 멈추면 35초 후 중단하고 대기실에서 다시 시도합니다.
-  // 서버 측에서 이미 시작된 응시를 재사용하는지 Worker에서 반드시 확인해야 합니다.
-  const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),35000);
-  let r;
-  try{
-   const res=await fetch(API+'/api/quiz-start',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({quizId}),signal:controller.signal,cache:'no-store'});
-   if(!res.ok)throw Error('퀴즈 시작 요청 실패 (HTTP '+res.status+')');
-   r=await res.json();
-  }catch(e){if(e.name==='AbortError')throw Error('퀴즈 시작 응답 시간 초과 (35초)');throw e;}
-  finally{clearTimeout(timeout);}
-  if(!r.ok)throw Error(r.error||'퀴즈 시작 실패');if(!Array.isArray(r.questions)||!r.questions.length)throw Error('문항이 없습니다.');
+  const r=await liveRequest19('/api/quiz-start',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({quizId})},room,35000);
+  if(!liveCurrent19(room))return false;
+  if(!Array.isArray(r.questions)||!r.questions.length)throw Error('문항이 없습니다.');
   const answers=r.checkpoint;
-  if(!Array.isArray(answers)||answers.length>r.questions.length||answers.some((a,i)=>String(a.questionId)!==String(r.questions[i].questionId)))throw Error('서버에 저장된 진행 기록이 현재 문항과 일치하지 않습니다.');
+  if(!Array.isArray(answers)||answers.length>r.questions.length||answers.some((a,i)=>!a||String(a.questionId)!==String(r.questions[i].questionId)))throw Error('서버에 저장된 진행 기록이 현재 문항과 일치하지 않습니다.');
   activeAttempt={ticket:r.ticket,quiz:{...r.quiz,quizId},questions:r.questions,index:answers.length,answers:answers.slice()};
-  // 과거 로컬 이어풀기 데이터는 읽지 않습니다. 다른 세션 답안의 혼입을 방지합니다.
-  if(activeAttempt.index>=activeAttempt.questions.length){await submitAttempt();return true;}
+  if(activeAttempt.index>=activeAttempt.questions.length){void submitAttempt();return true;}
   renderQuestion();void syncLiveProgress94(activeAttempt);
   if(activeAttempt.index)msg((activeAttempt.index+1)+'번 문제부터 이어서 풉니다.');
-  box.scrollIntoView({behavior:'smooth',block:'start'});
-  return true;
- }catch(e){activeAttempt=null;box.classList.add('hidden');$('quizDetail').classList.remove('hidden');box.textContent='퀴즈 시작이 지연되고 있습니다. 대기실에서 자동으로 다시 시도합니다.';msg(e.message,true);return false;}
+  box.scrollIntoView({behavior:'smooth',block:'start'});return true;
+ }catch(e){
+  if(!liveCurrent19(room))return false;
+  activeAttempt=null;box.classList.add('hidden');$('quizDetail').classList.remove('hidden');
+  if(e.status===401||e.status===403)room.blocked=true;
+  msg(e.message,true);return false;
+ }
 }
+
 function renderQuestion(){
  clearInterval(questionTimer);const a=activeAttempt;if(!a)return;const q=a.questions[a.index],box=$('quizPlay');box.replaceChildren();
  const heading=document.createElement('h3');heading.textContent=`${a.quiz.title} (${a.index+1}/${a.questions.length})`;box.append(heading);
@@ -247,7 +303,7 @@ function renderQuestion(){
   if(!Array.isArray(saved.answers)||saved.answers.length<a.index+1||saved.answers.length>a.questions.length)throw Error('서버 저장 상태를 확인할 수 없습니다.');
   a.answers=saved.answers;a.index=saved.index;
  }catch(e){
-  done=false;btn.disabled=false;btn.textContent='동일한 답안 다시 저장';
+  done=false;btn.disabled=false;btn.textContent='동일한 답안 다시 저장';timer.textContent='답안 제출 시각이 확정되었습니다. 저장만 다시 시도합니다.';
   msg('답안 저장 실패: '+e.message+' (다음 문제로 넘어가지 않았습니다.)',true);
   return;
  }
@@ -261,10 +317,28 @@ function renderQuestion(){
  const tick=()=>{const elapsed=(performance.now()-start)/1000;if(limit>0){const remain=Math.max(0,limit-elapsed);timer.textContent='남은 시간: '+remain.toFixed(1)+'초';if(remain<=0)complete(true);}else timer.textContent='제한시간 없음';};
  tick();questionTimer=setInterval(tick,100);
 }
+// v20: 제출 응답이 끊겨도 기존 응시·답안을 보존하고 같은 내용만 재제출합니다.
+let submitting20=false;
 async function submitAttempt(){
- const a=activeAttempt,box=$('quizPlay');box.textContent='채점 및 저장 중...';
- try{const res=await fetch(API+'/api/quiz-submit',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({ticket:a.ticket,answers:a.answers})});const r=await res.json();if(!r.ok)throw Error(r.error||'제출 실패');activeAttempt=null;box.replaceChildren();const title=document.createElement('h3');title.textContent='응시 완료';const p=document.createElement('p');p.textContent=`${r.score}점`;box.append(title,p);msg('퀴즈 결과가 저장되었습니다.');await records();}
- catch(e){box.replaceChildren();const p=document.createElement('p');p.className='err';p.textContent='저장에 실패했습니다: '+e.message;const retry=document.createElement('button');retry.textContent='동일한 답안 다시 제출';retry.onclick=submitAttempt;box.append(p,retry);msg('결과가 저장되지 않았을 수 있습니다. 새 퀴즈를 시작하지 말고 재제출해 주세요.',true)}
+ if(submitting20||!activeAttempt)return;
+ submitting20=true;
+ const a=activeAttempt,box=$('quizPlay');box.classList.remove('hidden');box.textContent='채점 및 저장 중...';
+ const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),35000);
+ try{
+  const res=await fetch(API+'/api/quiz-submit',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({ticket:a.ticket,answers:a.answers}),signal:controller.signal,cache:'no-store'});
+  let r;try{r=await res.json();}catch{throw Error('서버 응답을 읽지 못했습니다. 저장 여부를 확인하기 위해 같은 답안으로 재제출해 주세요.');}
+  if(!res.ok||!r.ok)throw Error(r.error||'제출 실패 ('+res.status+')');
+  if(activeAttempt!==a)return;
+  activeAttempt=null;box.replaceChildren();const title=document.createElement('h3');title.textContent='응시 완료';const p=document.createElement('p');p.textContent=`${r.score}점`;box.append(title,p);msg('퀴즈 결과가 저장되었습니다.');
+  if(liveRoom19&&liveRoom19.finished)stopLive9();
+  await records();
+ }catch(e){
+  if(activeAttempt!==a)return;
+  box.replaceChildren();const p=document.createElement('p');p.className='err';p.textContent='제출 확인 실패: '+(e.name==='AbortError'?'35초 동안 응답이 없어 연결을 중단했습니다.':e.message);
+  const note=document.createElement('p');note.className='info';note.textContent='서버에 결과가 이미 저장되었을 수 있습니다. 새 퀴즈를 시작하거나 새로고침하지 말고, 동일한 답안으로 다시 제출해 주세요.';
+  const retry=document.createElement('button');retry.textContent='동일한 답안 다시 제출';retry.onclick=()=>void submitAttempt();box.append(p,note,retry);
+  msg('제출 확인이 필요합니다. 동일한 답안으로 재제출해 주세요.',true);
+ }finally{clearTimeout(timeout);submitting20=false;}
 }
 
 
@@ -350,6 +424,7 @@ async function portalApi(kind,method='GET',data=null){
 }
 function portalNavigate(menu){
  if(activeAttempt&&menu!=='quizzes')return msg('진행 중인 퀴즈를 마친 뒤 이동해 주세요.',true);
+ if(menu!=='quizzes')stopLive9();
  portalState.menu=menu;$('quizArea').classList.toggle('hidden',menu!=='quizzes');$('portalPanel').classList.toggle('hidden',menu==='quizzes');
  document.querySelectorAll('#portalNav button').forEach(b=>b.setAttribute('aria-current',b.dataset.menu===menu?'page':'false'));
  if(menu==='quizzes'){
