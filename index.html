@@ -35,7 +35,7 @@ button:hover{background:#1e39a3}button:disabled{opacity:.55;cursor:wait}.hidden{
 #quizPlay label.option{display:flex;align-items:flex-start;gap:10px;padding:13px 12px;border:1px solid #dbe3f0;border-radius:12px;margin:9px 0;background:white;cursor:pointer;font-weight:500;line-height:1.65;min-height:48px}
 #quizPlay label.option:has(input:checked){background:#edf3ff;border-color:#2546c7;box-shadow:inset 0 0 0 1px #2546c7}
 #quizPlay label.option input{flex:none;width:19px;height:19px;margin:3px 0 0;accent-color:#2546c7}#quizPlay label.option span{min-width:0;overflow-wrap:anywhere}
-.question{padding:16px 0;border-bottom:1px solid #e2e8f0}.question strong{white-space:pre-wrap}.option{display:block;padding:7px 0}sup{font-size:.72em;line-height:0;vertical-align:super}.math-content{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8}.math-content .katex{font-size:1.04em}.math-content .katex-html{white-space:nowrap}.math-content .math-fallback{font-family:inherit}
+.question{padding:16px 0;border-bottom:1px solid #e2e8f0}.question strong{white-space:pre-wrap}.option{display:block;padding:11px 0;line-height:2.5}sup{font-size:.72em;line-height:0;vertical-align:super}.math-content{white-space:pre-wrap;overflow-wrap:anywhere;line-height:2.5;padding-top:5px;padding-bottom:5px;overflow:visible}.math-content .katex{font-size:1.04em;display:inline-block;vertical-align:middle;line-height:1.3}.math-content .katex-html{white-space:nowrap}.math-content .math-fallback{font-family:inherit}
 @media(max-width:520px){.wrap{padding:0 0 35px}.card{border:0;border-radius:0;min-height:100vh;padding:22px 18px}.chart{padding:12px}.chartrow{grid-template-columns:48px minmax(0,1fr) 62px;gap:7px}.review{padding:13px}#quizPlay{padding:14px}}
 @media(prefers-reduced-motion:reduce){button{transition:none}*{scroll-behavior:auto!important}}
 
@@ -92,35 +92,47 @@ function normalizeMath(s){
     .replace(/÷/g,'\\div ')
     .replace(/\^([0-9a-zA-Z])/g,'^{$1}');
 }
+// 학생 화면 수식 표시: 교사용 미리보기와 동일한 근호·분수·변수 규칙.
+// 데이터 원문은 변경하지 않으며, $...$ 및 \(...\) 구간은 우선 보존합니다.
+function studentPlainMath21(text){
+  const explicit=/^(?:\$[^$\n]+\$|\\\([^\n]+?\\\))$/;
+  const parts=String(text).split(/(\$[^$\n]+\$|\\\([^\n]+?\\\))/g);
+  const atom='(?:\\([^()]*\\)|√\\([^()]*\\)|√[A-Za-z0-9]+|[A-Za-z0-9]+)';
+  const numerator='(?:\\([^()]*\\)\\s*√\\([^()]*\\)|'+atom+')';
+  const fraction=new RegExp('('+numerator+')\\s*[/÷]\\s*('+atom+')','g');
+  function latexAtom(v){return v.trim().replace(/−/g,'-').replace(/√\(([^()]*)\)/g,(_,x)=>'\\sqrt{'+x+'}').replace(/√([A-Za-z0-9]+)/g,(_,x)=>'\\sqrt{'+x+'}');}
+  return parts.map(part=>{
+    if(explicit.test(part))return part;
+    let out=part.replace(fraction,(_,n,d)=>'\u0001'+encodeURIComponent('\\dfrac{'+latexAtom(n)+'}{'+latexAtom(d)+'}')+'\u0002');
+    out=out.replace(/√\s*\(([^()]*)\)/g,(_,x)=>'\u0001'+encodeURIComponent('\\sqrt{'+x.replace(/−/g,'-')+'}')+'\u0002');
+    out=out.replace(/√\s*(\d+(?:\.\d+)?)/g,(_,x)=>'\u0001'+encodeURIComponent('\\sqrt{'+x+'}')+'\u0002');
+    // 숫자와 비교 기호가 포함된 수학식은 함께 조판하되 한글 문장은 보존.
+    out=out.replace(/(?:[a-zA-Z]\s*(?:>=|<=|[<>≥≤=])\s*-?\d+(?:\.\d+)?)/g,m=>'\u0001'+encodeURIComponent(m)+'\u0002');
+    out=out.split(/(\u0001[^\u0002]+\u0002)/g).map(segment=>{
+      if(segment.startsWith('\u0001'))return segment;
+      return segment.replace(/(^|[^A-Za-z])([a-z]{1,3})(?=$|[^A-Za-z])/g,(whole,before,letters)=>{
+        if(letters.length>1&&!/^[abcxyzmnkpqt]+$/.test(letters))return whole;
+        if(/^(?:cm|mm|km|am|pm|max|min)$/.test(letters))return whole;
+        return before+'\u0001'+encodeURIComponent(letters)+'\u0002';
+      });
+    }).join('');
+    return out.replace(/\u0001([^\u0002]+)\u0002/g,(_,v)=>'$'+decodeURIComponent(v)+'$');
+  }).join('');
+}
 function mathText(element,raw){
-  const source=String(raw??'');element.replaceChildren();element.classList.add('math-content');
+  const source=studentPlainMath21(String(raw??''));
+  element.replaceChildren();element.classList.add('math-content');
   const appendPlain=t=>{if(t)element.append(document.createTextNode(t));};
   const appendMath=t=>{
     if(!t)return;
     if(!window.katex){appendPlain(t);return;}
-    try{
-      const span=document.createElement('span');
-      window.katex.render(normalizeMath(t),span,{throwOnError:true,strict:'ignore',trust:false,output:'htmlAndMathml'});
-      element.append(span);
-    }catch(e){appendPlain(t);}
+    try{const span=document.createElement('span');window.katex.render(normalizeMath(t),span,{throwOnError:true,strict:'ignore',trust:false,output:'htmlAndMathml'});element.append(span);}
+    catch(e){appendPlain(t);}
   };
-  // $...$와 \\(...\\)는 작성자가 명시한 수식으로 취급합니다.
-  // 일반 문장에서는 변수+지수, 부등식, 집합 연산, 절댓값 등 확실한 패턴만 인식합니다.
-  const explicit=/\$([^$\n]{1,300})\$|\\\(([^\n]{1,300}?)\\\)/g;
-  function scanPlain(text){
-    // 정규식은 한글 조사(는, 에, 이다 등)를 수식으로 끌어들이지 않도록 제한합니다.
-    const expr=/(?:\|[A-Za-z][A-Za-z0-9^{}+\-* ]{0,18}\|\s*(?:<=|>=|[<>≤≥=])\s*-?\d+)|(?:[A-Za-z](?:\^\{?-?[A-Za-z0-9]+\}?|[⁰¹²³⁴⁵⁶⁷⁸⁹]+)?\s*(?:<=|>=|[<>≤≥=≠]|\\(?:leq|geq|neq)\b)\s*-?\d+(?:\^\{?\d+\}?)?)|(?:[A-Za-z]\s*(?:∈|∉|\\(?:in|notin)\b)\s*[A-Za-z])|(?:[A-Za-z]\s*(?:∪|∩|⊂|⊆|⊃|⊇|\\(?:cup|cap|subseteq|subset|supseteq|supset)\b)\s*[A-Za-z])|(?:[A-Za-z]\^\{?-?[A-Za-z0-9]+\}?)|(?:[A-Za-z][⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g;
-    let last=0,m;
-    while((m=expr.exec(text))){
-      // 영단어 중간에서 변수를 잡지 않도록 좌측 경계 확인.
-      if(m.index>0 && /[A-Za-z0-9_]/.test(text[m.index-1]))continue;
-      appendPlain(text.slice(last,m.index));appendMath(m[0]);last=expr.lastIndex;
-    }
-    appendPlain(text.slice(last));
-  }
+  const re=/\$([^$\n]{1,1000})\$|\\\(([^\n]{1,1000}?)\\\)/g;
   let last=0,m;
-  while((m=explicit.exec(source))){scanPlain(source.slice(last,m.index));appendMath(m[1]??m[2]);last=explicit.lastIndex;}
-  scanPlain(source.slice(last));
+  while((m=re.exec(source))){appendPlain(source.slice(last,m.index));appendMath(m[1]??m[2]);last=re.lastIndex;}
+  appendPlain(source.slice(last));
 }
 
 let activeAttempt=null,questionTimer=null;
