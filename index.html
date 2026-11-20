@@ -93,6 +93,19 @@ button:not(:disabled){transition:background-color .15s,border-color .15s,box-sha
 #quizPlay{background:#fff;border:2px solid #294d87;border-radius:22px;padding:clamp(16px,4vw,30px);box-shadow:0 12px 32px #14284918}#quizPlay h3{background:#142849;color:#fff;padding:14px 16px;border-radius:12px;letter-spacing:-.02em}#quizPlay>p{color:#142849;font-size:18px}#quizPlay label.option{border:1px solid #cbd8ec;border-radius:14px;padding:16px;min-height:56px}#quizPlay label.option:has(input:checked){background:#e5efff;border-color:#315fc2;box-shadow:inset 0 0 0 1px #315fc2}#quizPlay button:not(:disabled){background:#234d99}#quizPlay .stat{background:#fff0c5;color:#563b0b;border:1px solid #e7c66d}
 @media(max-width:520px){.wrap{padding:12px 8px 35px}.wrap>.card{padding:16px!important;min-height:calc(100vh - 24px)}.wrap .brand{padding:20px!important}.portalnav{grid-template-columns:repeat(2,minmax(0,1fr))}#quizPlay{padding:14px}#quizPlay>p{font-size:16px}}
 </style>
+<style id="sp29-design">
+
+:root{--sp-ink:#14294a;--sp-blue:#2859ae;--sp-edge:#d8e3f1}
+body{background:#edf2f9!important}
+button:focus-visible{outline:3px solid #779ee8;outline-offset:2px}
+#sp24[hidden]{display:none!important}
+
+.wrap{max-width:1050px!important;padding:24px 16px 50px!important}.wrap>.card{padding:clamp(16px,3vw,32px)!important;border-radius:24px!important}.wrap .brand{margin-bottom:24px!important;min-height:118px;background:linear-gradient(115deg,#14294a,#2859ae)!important}
+#account:not(.hidden){display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center}#account>#who{margin:0!important;padding:16px!important;border-radius:14px}#account>#logout{margin:0!important;padding:12px!important;min-width:80px}#account>#portalNav,#account>#portalPanel,#account>#quizArea{grid-column:1/-1;min-width:0}
+#portalNav{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:12px;background:#14294a;border-radius:16px}#portalNav button{min-height:60px!important;background:#253f66!important;border-color:#405e88!important;color:#f1f6ff!important;font-weight:700;white-space:normal}#portalNav button[aria-current="page"],#portalNav button.active{background:#4677d0!important;color:#fff!important;border-color:#9bb9ef!important}
+#portalPanel,#quizArea{padding:clamp(12px,2vw,22px);border-radius:18px;background:#f5f8fd;border:1px solid #d8e3f1}#quizPlay:not(.hidden){border:2px solid #315da5!important;border-radius:18px!important;background:#fff!important;padding:clamp(14px,3vw,28px)!important}#quizPlay label.option{border:2px solid #d8e3f1!important;background:#fff!important}#quizPlay label.option:has(input:checked){background:#e0ebff!important;border-color:#2859ae!important}#quizPlay label.option:hover{border-color:#7399da!important}#quizPlay button:not(:disabled){min-height:44px;border-radius:12px}#quizPlay .stat{background:#f9e4a7!important;color:#4e350d!important}
+@media(max-width:600px){.wrap{padding:10px!important}.wrap>.card{padding:14px!important}#portalNav{grid-template-columns:repeat(2,minmax(0,1fr))}#portalNav button{min-height:50px!important}#account>#who{font-size:16px;padding:12px!important}#quizArea,#portalPanel{padding:10px}#quizPlay:not(.hidden){padding:12px!important}}
+</style>
 </head>
 <body>
 <aside id="sp24" hidden style="display:none!important"><button id="sp24play" type="button" aria-pressed="false">♫ 음악 재생</button><label for="sp24vol">음량</label><input id="sp24vol" type="range" min="0" max="100" value="50"><small id="sp24status" role="status">퀴즈 입장 시 자동 재생</small></aside>
