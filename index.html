@@ -67,6 +67,8 @@ button:hover{background:#1e39a3}button:disabled{opacity:.55;cursor:wait}.hidden{
 .portal-notice-date{font-size:12px;color:#8a98aa;margin:8px 0 18px}.portal-notice-body{background:#f8f8f7;border-radius:14px;padding:20px 22px;color:#111;line-height:1.95;font-size:15px}
 .portal-notice-body .portal-rich{color:#111;font-size:15px;line-height:1.95}.portal-notice-body .portal-rich div{margin:0}.portal-notice-body .portal-rich br{display:block}
 @media(max-width:520px){.portal-notice-body{padding:16px}.portal-notice-detail h2{font-size:23px}}
+
+.portal-answer-v30{margin-top:12px;padding:14px;border-radius:12px;background:#edf5ff;border:1px solid #c9dafa;white-space:pre-wrap}.portal-answer-v30[hidden]{display:none}
 </style>
 <style id="sp24-theme">
 :root{--bg:#e8eff9;--card:#fff;--text:#172b4d;--line:#c6d5eb;--shadow:0 8px 24px #183e7918}
@@ -500,14 +502,38 @@ async function portalLoad(kind){const box=$('portalPanel');box.replaceChildren(p
    if(kind==='notices')box.append(portalItem(x.title,x.createdAt||x.date,(x.importance==='중요'?'[중요] ':'')+x.content));
    if(kind==='lessons')box.append(portalItem(x.unit||'수업 기록',[x.date,x.className].filter(Boolean).join(' · '),x.content));
    if(kind==='materials'){const item=portalItem(x.title||'수업자료',[x.unit,x.type,x.folderName].filter(Boolean).join(' · '));if(/^https:\/\//i.test(x.link)){const a=portalNode('a','자료 열기','portal-link');a.href=x.link;a.target='_blank';a.rel='noopener noreferrer';item.append(a)}box.append(item);}
-   if(kind==='questions')box.append(portalItem(x.title,[x.date,x.unit,x.status].filter(Boolean).join(' · '),'질문: '+x.content+(x.answer?'\n\n선생님 답변: '+x.answer:'')));
+   if(kind==='questions'){
+    const item=portalItem(x.title,[x.date,x.unit,x.status].filter(Boolean).join(' · '),'질문: '+x.content);
+    if(x.answer|| (x.answerImageIds&&x.answerImageIds.length)){
+      const b=portalNode('button',x.answerCheckedAt?'선생님 답변 다시 보기':'선생님 답변 확인하기','smallbtn');b.type='button';
+      const replyBox=portalNode('div',undefined,'portal-answer-v30');replyBox.hidden=true;
+      b.onclick=async()=>{
+        if(!replyBox.hidden){replyBox.hidden=true;b.textContent='선생님 답변 보기';return;}
+        replyBox.replaceChildren(portalNode('strong','선생님 답변'),portalNode('p',x.answer||'첨부 답변이 있습니다.'));
+        if(x.answerImageIds&&x.answerImageIds.length)replyBox.append(portalNode('p','답변에 첨부된 이미지가 있습니다. (이미지 표시 기능은 기존 학생용 화면에서 지원하지 않습니다.)','muted'));
+        replyBox.hidden=false;
+        if(!x.answerCheckedAt){
+          b.disabled=true;
+          try{
+            const res=await fetch(API+'/api/portal/answer-read',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({questionId:x.id,ownerToken:portalOwnerToken()})});
+            const data=await res.json();if(!data.ok)throw Error(data.error||'확인 상태 저장 실패');
+            x.answerCheckedAt=data.checkedAt||'확인';
+          }catch(e){replyBox.append(portalNode('p','답변은 표시했지만 확인 기록을 저장하지 못했습니다: '+e.message,'err'));}
+          finally{b.disabled=false;}
+        }
+        b.textContent='선생님 답변 접기';
+      };
+      item.append(b,replyBox);
+    }
+    box.append(item);
+   }
    if(kind==='feedbacks')box.append(portalItem(x.unit,[x.date,'이해도 '+x.understanding+'/5'].filter(Boolean).join(' · '),x.content));
   });
  }catch(e){box.replaceChildren(portalNode('p','불러오지 못했습니다: '+e.message,'err'));}
 }
 function portalForm(box,kind){const form=portalNode('form',undefined,'portal-form');const fields=kind==='questions'?[['unit','단원'],['title','질문 제목'],['content','질문 내용']]:[['unit','단원'],['content','오늘 수업 내용'],['understanding','이해도 (1~5)'],['difficult','어려웠던 점'],['notUnderstood','이해하지 못한 점'],['easy','쉬웠던 점'],['good','좋았던 점'],['disappointing','아쉬웠던 점'],['question','선생님께 질문']];
  fields.forEach(([key,label])=>{const lab=portalNode('label',label);lab.htmlFor='portal_'+key;let field;if(key==='understanding'){field=document.createElement('select');field.append(new Option('이해도 선택',''),...[1,2,3,4,5].map(i=>new Option(i+'점',String(i))))}else if(['content','difficult','notUnderstood','easy','good','disappointing','question'].includes(key)){field=document.createElement('textarea');field.maxLength=key==='content'?5000:1500;}else{field=document.createElement('input');field.maxLength=key==='unit'?80:150;}field.id='portal_'+key;field.name=key;if(['unit','title','content','understanding'].includes(key))field.required=true;form.append(lab,field)});
- const b=portalNode('button',kind==='questions'?'익명 질문 등록':'익명 피드백 제출');b.type='submit';form.append(b);const info=portalNode('p','기존 익명 접근키가 현재 브라우저에 남아 있다면 과거 내역도 확인할 수 있습니다. 다른 브라우저의 과거 내역은 자동으로 연결되지 않습니다.','muted');form.append(info);
+ const b=portalNode('button',kind==='questions'?'익명 질문 등록':'익명 피드백 제출');b.type='submit';form.append(b);const info=portalNode('p','새 질문은 로그인한 학생 계정에 연결되어 다른 기기에서도 확인할 수 있습니다. 이전 질문은 작성 당시 브라우저의 익명 접근키가 있어야 표시될 수 있습니다.','muted');form.append(info);
  form.onsubmit=async e=>{e.preventDefault();b.disabled=true;try{const data=Object.fromEntries(new FormData(form).entries());const r=await portalApi(kind==='questions'?'question':'feedback','POST',data);msg(r.message||'저장되었습니다.');await portalLoad(kind)}catch(err){msg(err.message,true)}finally{b.disabled=false}};box.append(form);
 }
 
