@@ -213,6 +213,17 @@ body,button,input,select,textarea{font-family:inherit}
 .sp38-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}.sp38-section{min-width:0;border:1px solid #dce4ef;border-radius:14px;padding:18px;background:#f8fafc}.sp38-section:last-child{grid-column:1/-1}.sp38-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}.sp38-head h4{margin:0!important;font-size:18px;color:#17365f}.sp38-head .sp38-more{width:auto!important;flex:none;margin:0!important;padding:7px 10px!important;background:#eaf2ff!important;color:#2459b4!important;font-size:13px!important;border:0!important;border-radius:7px!important}.sp38-section .portal-item,.sp38-section .portal-notice-listitem{margin:0 0 10px!important;padding:14px!important;overflow-wrap:anywhere}.sp38-section .portal-item:last-child,.sp38-section .portal-notice-listitem:last-child{margin-bottom:0!important}.sp38-section .portal-item h4,.sp38-section .portal-notice-listitem strong{font-size:16px!important;line-height:1.5}.sp38-section .muted{font-size:13px!important}
 @media(max-width:1100px){.sp38-grid{grid-template-columns:1fr}.sp38-section:last-child{grid-column:auto}}@media(max-width:600px){#portalPanel .sp38-welcome{flex-direction:column;align-items:stretch;padding:16px;gap:12px}#portalPanel .sp38-start{width:100%!important}.sp38-section{padding:12px}.sp38-grid{gap:12px}.sp38-head h4{font-size:16px}}
 </style>
+<style id="supoiler-v39-detail">
+#portalPanel:has(>.portal-notice-listitem)>.portal-notice-listitem{padding:20px 24px!important;border-left:4px solid #527bbd!important;margin:12px 0!important}
+#portalPanel>.portal-notice-detail{padding:clamp(16px,2vw,28px);border:1px solid #dce4ef;border-radius:14px;background:white}
+#portalPanel .portal-notice-body{background:#f5f8fc;color:#17365f}
+.sp39-list{min-width:0;display:grid;gap:12px;align-content:start}.sp39-list>.portal-item{margin:0!important;min-width:0}.sp39-list h4{font-size:17px}.sp39-list small{font-size:13px;color:#64748b}.sp39-list .portal-rich{line-height:1.8}
+.sp39-materials{grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr))}.sp39-materials .portal-item{display:flex;flex-direction:column;align-items:flex-start;gap:8px}.sp39-materials h4:before{content:'▤';color:#5274a8;margin-right:9px}.sp39-materials .portal-link{display:inline-flex;margin-top:auto;padding:10px 15px;border-radius:8px;background:#eaf2ff;color:#174eb6;font-weight:700;text-decoration:none}
+.sp39-lessons{border-left:2px solid #c9d9ef;padding-left:22px;margin-left:8px}.sp39-lessons>.portal-item{position:relative}.sp39-lessons>.portal-item:before{content:'';position:absolute;left:-30px;top:25px;width:12px;height:12px;border-radius:50%;background:#527bbd;border:3px solid white}
+.sp39-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}.sp39-split>section{min-width:0;padding:18px;border:1px solid #dce4ef;border-radius:14px;background:#f5f8fc}.sp39-split h4.sp39-heading{margin:0 0 16px;font-size:18px;color:#17365f}.sp39-split .portal-form{margin:0;padding:0;background:transparent;border:0;max-width:none}.sp39-split .portal-form textarea{min-height:100px}.sp39-split .portal-answer-v30{margin-top:12px;padding:16px;background:#edf7f1;border-radius:10px;overflow-wrap:anywhere}.sp39-split .portal-answer-v30[hidden]{display:none!important}
+#quizList>.quizcard{display:flex;flex-direction:column;gap:6px;padding:22px!important}#quizList>.quizcard>button{margin-top:auto;min-height:46px}#quizList>.quizcard>strong{font-size:18px}#quizList>.quizcard>.info{font-size:13px;line-height:1.6}
+@media(max-width:1100px){.sp39-split{grid-template-columns:1fr}}@media(max-width:600px){.sp39-split{gap:12px}.sp39-split>section{padding:12px}.sp39-materials{grid-template-columns:1fr}.sp39-lessons{padding-left:16px}.sp39-lessons>.portal-item:before{left:-24px}#portalPanel:has(>.portal-notice-listitem)>.portal-notice-listitem{padding:15px!important}}
+</style>
 </head>
 <body>
 <aside id="sp24" hidden style="display:none!important"><button id="sp24play" type="button" aria-pressed="false">♫ 음악 재생</button><label for="sp24vol">음량</label><input id="sp24vol" type="range" min="0" max="100" value="50"><small id="sp24status" role="status">퀴즈 입장 시 자동 재생</small></aside>
@@ -615,12 +626,17 @@ async function portalLoad(kind){const box=$('portalPanel');box.replaceChildren(p
   }
   const r=await portalApi(kind);box.replaceChildren(portalNode('h3',PORTAL_MENUS.find(x=>x[0]===kind)?.[1]||''));
   if(kind==='notices'){portalNoticeList(box,r.items);return;}
-  if(kind==='questions'||kind==='feedbacks')portalForm(box,kind);
-  if(!r.items.length)box.append(portalNode('p','표시할 내역이 없습니다.'));
+  const list=portalNode('div',undefined,'sp39-list sp39-'+kind);
+  if(kind==='questions'||kind==='feedbacks'){
+   const split=portalNode('div',undefined,'sp39-split'),left=portalNode('section'),right=portalNode('section');
+   left.append(portalNode('h4',kind==='questions'?'질문 작성':'피드백 작성','sp39-heading'));portalForm(left,kind);
+   right.append(portalNode('h4',kind==='questions'?'내 질문 및 답변':'이전 피드백','sp39-heading'),list);split.append(left,right);box.append(split);
+  }else box.append(list);
+  if(!r.items.length)list.append(portalNode('p','표시할 내역이 없습니다.'));
   r.items.forEach(x=>{
-   if(kind==='notices')box.append(portalItem(x.title,x.createdAt||x.date,(x.importance==='중요'?'[중요] ':'')+x.content));
-   if(kind==='lessons')box.append(portalItem(x.unit||'수업 기록',[x.date,x.className].filter(Boolean).join(' · '),x.content));
-   if(kind==='materials'){const item=portalItem(x.title||'수업자료',[x.unit,x.type,x.folderName].filter(Boolean).join(' · '));if(/^https:\/\//i.test(x.link)){const a=portalNode('a','자료 열기','portal-link');a.href=x.link;a.target='_blank';a.rel='noopener noreferrer';item.append(a)}box.append(item);}
+   if(kind==='notices')list.append(portalItem(x.title,x.createdAt||x.date,(x.importance==='중요'?'[중요] ':'')+x.content));
+   if(kind==='lessons')list.append(portalItem(x.unit||'수업 기록',[x.date,x.className].filter(Boolean).join(' · '),x.content));
+   if(kind==='materials'){const item=portalItem(x.title||'수업자료',[x.unit,x.type,x.folderName].filter(Boolean).join(' · '));if(/^https:\/\//i.test(x.link)){const a=portalNode('a','자료 열기','portal-link');a.href=x.link;a.target='_blank';a.rel='noopener noreferrer';item.append(a)}list.append(item);}
    if(kind==='questions'){
     const item=portalItem(x.title,[x.date,x.unit,x.status].filter(Boolean).join(' · '),'질문: '+x.content);
     if(x.answer|| (x.answerImageIds&&x.answerImageIds.length)){
@@ -644,9 +660,9 @@ async function portalLoad(kind){const box=$('portalPanel');box.replaceChildren(p
       };
       item.append(b,replyBox);
     }
-    box.append(item);
+    list.append(item);
    }
-   if(kind==='feedbacks')box.append(portalItem(x.unit,[x.date,'이해도 '+x.understanding+'/5'].filter(Boolean).join(' · '),x.content));
+   if(kind==='feedbacks')list.append(portalItem(x.unit,[x.date,'이해도 '+x.understanding+'/5'].filter(Boolean).join(' · '),x.content));
   });
  }catch(e){box.replaceChildren(portalNode('p','불러오지 못했습니다: '+e.message,'err'));}
 }
